@@ -1,0 +1,557 @@
+import { useEffect, useState, useRef } from "react";
+import {
+  Plus,
+  MessageSquare,
+  Trash2,
+  FolderOpen,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  SquareCheck,
+  Square,
+  Pencil,
+  X,
+  Pin,
+  PinOff,
+  FolderInput,
+  Edit3,
+} from "lucide-react";
+import { useSessionStore, type SessionItem } from "../../stores/sessionStore";
+import { t } from "../../lib/i18n";
+
+interface Props {
+  onNewChat: () => void;
+  onLoadSession: (id: string) => void;
+  onDeleteSession: (id: string) => void;
+  onOpenSettings: () => void;
+}
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  sessionId?: string;
+  workspaceDir?: string;
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) {
+      return d.toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function truncate(str: string, max: number): string {
+  if (!str) return "";
+  return str.length > max ? str.slice(0, max) + "..." : str;
+}
+
+function getDirName(path: string): string {
+  if (!path) return "其他";
+  const parts = path.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] || path;
+}
+
+function ContextMenu({
+  menu,
+  pinned,
+  onClose,
+  onPin,
+  onOpenExplorer,
+  onRename,
+  onRemove,
+}: {
+  menu: ContextMenuState;
+  pinned: boolean;
+  onClose: () => void;
+  onPin: () => void;
+  onOpenExplorer: () => void;
+  onRename: () => void;
+  onRemove: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const handleScroll = () => onClose();
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [onClose]);
+
+  const items = [
+    {
+      icon: pinned ? PinOff : Pin,
+      label: pinned ? t("unpin") : t("pin"),
+      onClick: onPin,
+    },
+    { icon: FolderInput, label: t("open_in_explorer"), onClick: onOpenExplorer },
+    ...(menu.sessionId
+      ? [{ icon: Edit3, label: t("rename"), onClick: onRename }]
+      : []),
+    { icon: Trash2, label: t("remove_project"), onClick: onRemove, danger: true },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-[100] bg-surface border border-bdr rounded-lg shadow-xl py-1 min-w-[180px]"
+      style={{ left: menu.x, top: menu.y }}
+    >
+      {items.map((item, i) => (
+        <button
+          key={i}
+          onClick={() => {
+            item.onClick();
+            onClose();
+          }}
+          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors cursor-pointer ${
+            item.danger
+              ? "text-red-400 hover:bg-red-500/10"
+              : "text-txt-2 hover:bg-elevated"
+          }`}
+        >
+          <item.icon className="w-3.5 h-3.5" />
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SessionItemRow({
+  session,
+  isActive,
+  isManageMode,
+  isSelected,
+  onLoad,
+  onDelete,
+  onToggleSelect,
+  onContextMenu,
+}: {
+  session: SessionItem;
+  isActive: boolean;
+  isManageMode: boolean;
+  isSelected: boolean;
+  onLoad: (id: string) => void;
+  onDelete: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, sessionId: string) => void;
+}) {
+  return (
+    <div
+      className={`group flex items-start gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors ${
+        isActive && !isManageMode
+          ? "bg-accent/10 border-l-2 border-accent"
+          : "border-l-2 border-transparent hover:bg-elevated/40"
+      } ${isSelected ? "bg-accent/10" : ""}`}
+      onClick={() => (isManageMode ? onToggleSelect(session.id) : onLoad(session.id))}
+      onContextMenu={(e) => onContextMenu(e, session.id)}
+    >
+      {isManageMode ? (
+        <div className="flex-shrink-0 mt-0.5">
+          {isSelected ? (
+            <SquareCheck className="w-4 h-4 text-accent" />
+          ) : (
+            <Square className="w-4 h-4 text-txt-g" />
+          )}
+        </div>
+      ) : (
+        <MessageSquare className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isActive ? "text-accent" : "text-txt-g"}`} />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm truncate ${isActive ? "text-accent" : "text-txt"}`}>
+          {truncate(session.lastMessage, 35)}
+        </div>
+        <div className="text-[10px] text-txt-m mt-0.5">
+          {formatDate(session.updatedAt)}
+        </div>
+      </div>
+      {!isManageMode && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(session.id);
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-txt-g transition-all cursor-pointer"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function LeftSidebar({
+  onNewChat,
+  onLoadSession,
+  onDeleteSession,
+  onOpenSettings,
+}: Props) {
+  const sessions = useSessionStore((s) => s.sessions);
+  const currentSessionId = useSessionStore((s) => s.currentSessionId);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [workingDir, setWorkingDir] = useState("");
+  const [currentExpanded, setCurrentExpanded] = useState(true);
+  const [otherExpanded, setOtherExpanded] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pinnedDirs, setPinnedDirs] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  useEffect(() => {
+    // ListSessions is called once in App.tsx; avoid duplicate calls here.
+    window.go?.desktop?.App?.GetWorkingDir?.()
+      .then(setWorkingDir)
+      .catch(console.error);
+  }, []);
+
+  // Close context menu on escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  const handleDelete = (id: string) => setDeleteTarget(id);
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      onDeleteSession(deleteTarget);
+      setDeleteTarget(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const session = sessions.find((s) => s.id === sessionId);
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      sessionId,
+      workspaceDir: session?.workingDir || workingDir,
+    });
+  };
+
+  const handleWorkspaceContextMenu = (e: React.MouseEvent, dir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      workspaceDir: dir,
+    });
+  };
+
+  const togglePin = (dir: string) => {
+    setPinnedDirs((prev) => {
+      const next = new Set(prev);
+      if (next.has(dir)) next.delete(dir);
+      else next.add(dir);
+      return next;
+    });
+  };
+
+  const deleteSelected = () => {
+    for (const id of selectedIds) onDeleteSession(id);
+    setSelectedIds(new Set());
+    setManageMode(false);
+  };
+
+  const deleteWorkspace = (dir: string) => {
+    const dirSessions = sessions.filter((s) => (s.workingDir || workingDir) === dir);
+    for (const s of dirSessions) onDeleteSession(s.id);
+  };
+
+  const confirmRename = () => {
+    if (renameTarget && renameValue.trim()) {
+      window.go?.desktop?.App?.RenameSession?.(renameTarget, renameValue.trim())
+        .then(() => {
+          useSessionStore.getState().updateSession(renameTarget, renameValue.trim());
+        })
+        .catch(console.error);
+    }
+    setRenameTarget(null);
+    setRenameValue("");
+  };
+
+  // Group sessions by working directory
+  const currentSessions: SessionItem[] = [];
+  const otherGroups = new Map<string, SessionItem[]>();
+
+  for (const session of sessions) {
+    if (!session.workingDir || session.workingDir === workingDir) {
+      currentSessions.push(session);
+    } else {
+      const dir = session.workingDir;
+      if (!otherGroups.has(dir)) otherGroups.set(dir, []);
+      otherGroups.get(dir)!.push(session);
+    }
+  }
+
+  // Sort: pinned dirs first
+  const sortedOtherGroups = Array.from(otherGroups.entries()).sort(([a], [b]) => {
+    const aPinned = pinnedDirs.has(a) ? 0 : 1;
+    const bPinned = pinnedDirs.has(b) ? 0 : 1;
+    return aPinned - bPinned;
+  });
+
+  const renderSessionRow = (session: SessionItem) => (
+    <SessionItemRow
+      key={session.id}
+      session={session}
+      isActive={currentSessionId === session.id}
+      isManageMode={manageMode}
+      isSelected={selectedIds.has(session.id)}
+      onLoad={onLoadSession}
+      onDelete={handleDelete}
+      onToggleSelect={toggleSelect}
+      onContextMenu={handleContextMenu}
+    />
+  );
+
+  const renderWorkspaceGroup = (dir: string, dirSessions: SessionItem[], isCurrent: boolean) => {
+    const isPinned = pinnedDirs.has(dir);
+    const wsManage = manageMode && selectedIds.size > 0;
+
+    return (
+      <div key={dir} className="mb-1">
+        <button
+          onClick={() => isCurrent ? setCurrentExpanded(!currentExpanded) : null}
+          onContextMenu={(e) => handleWorkspaceContextMenu(e, dir)}
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider w-full transition-colors cursor-pointer ${
+            isPinned ? "text-accent" : "text-txt-m hover:text-txt-g"
+          }`}
+        >
+          <ChevronDown className={`w-3 h-3 transition-transform ${isCurrent ? (currentExpanded ? "" : "-rotate-90") : (otherExpanded ? "" : "-rotate-90")}`} />
+          <FolderOpen className="w-3 h-3" />
+          <span className="truncate">{getDirName(dir)}</span>
+          {isPinned && <Pin className="w-2.5 h-2.5 ml-0.5" />}
+          {manageMode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const ids = dirSessions.map((s) => s.id);
+                const allSelected = ids.every((id) => selectedIds.has(id));
+                setSelectedIds((prev) => {
+                  const next = new Set(prev);
+                  if (allSelected) ids.forEach((id) => next.delete(id));
+                  else ids.forEach((id) => next.add(id));
+                  return next;
+                });
+              }}
+              className="ml-auto text-txt-g hover:text-accent cursor-pointer"
+            >
+              {dirSessions.every((s) => selectedIds.has(s.id)) ? (
+                <SquareCheck className="w-3 h-3 text-accent" />
+              ) : (
+                <Square className="w-3 h-3" />
+              )}
+            </button>
+          )}
+          {!manageMode && (
+            <span className="ml-auto text-txt-g">{dirSessions.length}</span>
+          )}
+        </button>
+        {(isCurrent ? currentExpanded : otherExpanded) && dirSessions.map(renderSessionRow)}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full w-[260px]">
+      {/* Header */}
+      <div className="p-3 border-b border-bdr-sub space-y-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onNewChat}
+            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-sm font-medium cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            {t("new_chat")}
+          </button>
+          <button
+            onClick={() => {
+              if (manageMode) {
+                setManageMode(false);
+                setSelectedIds(new Set());
+              } else {
+                setManageMode(true);
+              }
+            }}
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+              manageMode ? "bg-accent/20 text-accent" : "bg-elevated text-txt-g hover:text-txt"
+            }`}
+            title={t("manage")}
+          >
+            {manageMode ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {manageMode && selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-txt-m">
+              {t("selected_count")} {selectedIds.size}
+            </span>
+            <button
+              onClick={deleteSelected}
+              className="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3 h-3" />
+              {t("delete_selected")}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Session List */}
+      <div className="flex-1 overflow-y-auto py-1">
+        {sessions.length === 0 && (
+          <div className="px-4 py-8 text-center text-txt-m text-xs">
+            {t("no_sessions")}
+          </div>
+        )}
+
+        {currentSessions.length > 0 &&
+          renderWorkspaceGroup(workingDir, currentSessions, true)}
+
+        {sortedOtherGroups.map(([dir, dirSessions]) =>
+          renderWorkspaceGroup(dir, dirSessions, false)
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-bdr-sub p-2.5 flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-1.5 text-txt-m flex-1 min-w-0" title={workingDir}>
+          <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">{getDirName(workingDir) || "..."}</span>
+        </div>
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded-md text-txt-g hover:text-txt hover:bg-elevated transition-colors cursor-pointer flex-shrink-0"
+          title={t("settings")}
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          menu={contextMenu}
+          pinned={pinnedDirs.has(contextMenu.workspaceDir || "")}
+          onClose={() => setContextMenu(null)}
+          onPin={() => {
+            if (contextMenu.workspaceDir) togglePin(contextMenu.workspaceDir);
+          }}
+          onOpenExplorer={() => {
+            const dir = contextMenu.workspaceDir || workingDir;
+            window.go?.desktop?.App?.OpenInExplorer?.(dir).catch(console.error);
+          }}
+          onRename={() => {
+            if (contextMenu.sessionId) {
+              setRenameTarget(contextMenu.sessionId);
+              const s = sessions.find((s) => s.id === contextMenu.sessionId);
+              setRenameValue(s?.lastMessage || "");
+            }
+          }}
+          onRemove={() => {
+            if (contextMenu.sessionId) {
+              onDeleteSession(contextMenu.sessionId);
+            } else if (contextMenu.workspaceDir) {
+              deleteWorkspace(contextMenu.workspaceDir);
+            }
+          }}
+        />
+      )}
+
+      {/* Rename Dialog */}
+      {renameTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-surface border border-bdr rounded-xl w-[320px] mx-4 shadow-2xl">
+            <div className="px-5 py-4">
+              <h3 className="text-sm font-medium text-txt mb-3">{t("rename")}</h3>
+              <input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && confirmRename()}
+                className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center gap-2 px-5 py-3 border-t border-bdr-sub justify-end">
+              <button
+                onClick={() => { setRenameTarget(null); setRenameValue(""); }}
+                className="px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors cursor-pointer"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                onClick={confirmRename}
+                className="px-3 py-1.5 rounded-md text-sm bg-accent/20 text-accent hover:bg-accent/30 transition-colors cursor-pointer"
+              >
+                {t("save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-surface border border-bdr rounded-xl w-[320px] mx-4 shadow-2xl">
+            <div className="px-5 py-4">
+              <h3 className="text-sm font-medium text-txt mb-2">
+                {t("delete_session")}
+              </h3>
+              <p className="text-xs text-txt-g">{t("delete_confirm")}</p>
+            </div>
+            <div className="flex items-center gap-2 px-5 py-3 border-t border-bdr-sub justify-end">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors cursor-pointer"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-3 py-1.5 rounded-md text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors cursor-pointer"
+              >
+                {t("delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

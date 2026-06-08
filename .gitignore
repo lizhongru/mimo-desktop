@@ -1,0 +1,40 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+build/bin/
+
+# Go caches
+.gocache/
+.gomod/
+
+# Node
+desktop/frontend/node_modules/
+desktop/frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config with secrets
+.env
+*.pem
+*.key
+
+# Large generated files
+*.jsonl
+
+# MiMo local
+.mimo/
+
+# Claude / Codex local
+.claude/
