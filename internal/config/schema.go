@@ -33,13 +33,30 @@ type Config struct {
 }
 
 // ModelConfig represents a single model provider configuration
+// ModelConfig represents a single model provider configuration
 type ModelConfig struct {
+	// Provider info
+	Provider    string `yaml:"provider" mapstructure:"provider"`       // e.g. "OpenAI", "MiMo", "Custom"
+	Website     string `yaml:"website" mapstructure:"website"`         // Provider website URL
+	
+	// API settings
 	APIBase     string  `yaml:"api_base" mapstructure:"api_base"`
 	APIKey      string  `yaml:"api_key" mapstructure:"api_key"`
-	Model       string  `yaml:"model" mapstructure:"model"`
+	
+	// Model settings
+	Model       string  `yaml:"model" mapstructure:"model"`            // Default model ID
+	Models      []string `yaml:"models" mapstructure:"models"`         // Available model IDs
+	Fallback    string   `yaml:"fallback" mapstructure:"fallback"`     // Fallback model ID
+	
+	// Generation parameters
 	MaxTokens   int     `yaml:"max_tokens" mapstructure:"max_tokens"`
 	Temperature float64 `yaml:"temperature" mapstructure:"temperature"`
 	TopP        float64 `yaml:"top_p" mapstructure:"top_p"`
+	
+	// Features
+	Streaming   bool    `yaml:"streaming" mapstructure:"streaming"`    // Support streaming
+	Vision      bool    `yaml:"vision" mapstructure:"vision"`          // Support vision/images
+	Tools       bool    `yaml:"tools" mapstructure:"tools"`            // Support function calling
 }
 
 // SafetyConfig represents safety-related configuration
@@ -59,6 +76,7 @@ type AgentConfig struct {
 	MaxParallelTools   int    `yaml:"max_parallel_tools" mapstructure:"max_parallel_tools"`
 	PlanningMode       string `yaml:"planning_mode" mapstructure:"planning_mode"`
 	Permission         string `yaml:"permission" mapstructure:"permission"`
+	ReasoningLevel     string `yaml:"reasoning_level" mapstructure:"reasoning_level"`
 	AutoConfirmLowRisk bool   `yaml:"auto_confirm_low_risk" mapstructure:"auto_confirm_low_risk"`
 	ShowTokenUsage     bool   `yaml:"show_token_usage" mapstructure:"show_token_usage"`
 	ShowCost           bool   `yaml:"show_cost" mapstructure:"show_cost"`
@@ -117,6 +135,7 @@ func DefaultConfig() *Config {
 			MaxParallelTools:   5,
 			PlanningMode:       "auto",
 			Permission:         "exec",
+			ReasoningLevel:     "medium",
 			AutoConfirmLowRisk: true,
 			ShowTokenUsage:     true,
 			ShowCost:           true,

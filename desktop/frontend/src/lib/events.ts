@@ -11,6 +11,7 @@ export const EVENTS = {
   USAGE: "agent:usage",
   ERROR: "agent:error",
   COMPRESSING: "agent:compressing",
+  COMPRESS_DONE: "agent:compress_done",
   // Planning
   PLANNING: "agent:planning",
   PLAN_GENERATED: "agent:plan:generated",

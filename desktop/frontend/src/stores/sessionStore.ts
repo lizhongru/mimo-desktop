@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 
 export interface SessionItem {
   id: string;
@@ -13,10 +13,14 @@ export interface SessionItem {
 interface SessionState {
   sessions: SessionItem[];
   currentSessionId: string | null;
+  streamingSessionId: string | null;
+  exportingSessionId: string | null;
   leftSidebarOpen: boolean;
 
   setSessions: (sessions: SessionItem[]) => void;
   setCurrentSessionId: (id: string | null) => void;
+  setStreamingSessionId: (id: string | null) => void;
+  setExportingSessionId: (id: string | null) => void;
   addSession: (session: SessionItem) => void;
   removeSession: (id: string) => void;
   updateSession: (id: string, lastMessage: string) => void;
@@ -27,10 +31,14 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set) => ({
   sessions: [],
   currentSessionId: null,
+  streamingSessionId: null,
+  exportingSessionId: null,
   leftSidebarOpen: true,
 
   setSessions: (sessions) => set({ sessions }),
   setCurrentSessionId: (id) => set({ currentSessionId: id }),
+  setStreamingSessionId: (id) => set({ streamingSessionId: id }),
+  setExportingSessionId: (id) => set({ exportingSessionId: id }),
   addSession: (session) =>
     set((s) => ({ sessions: [session, ...s.sessions] })),
   removeSession: (id) =>

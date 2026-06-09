@@ -1,4 +1,4 @@
-package llm
+﻿package llm
 
 import (
 	"bufio"
@@ -282,6 +282,11 @@ func (p *OpenAIProvider) buildAPIRequest(req ChatRequest) openAIRequest {
 		apiReq.TopP = p.topP
 	}
 
+	// Set reasoning effort
+	if req.ReasoningEffort != "" {
+		apiReq.ReasoningEffort = req.ReasoningEffort
+	}
+
 	// Request usage in streaming responses
 	if apiReq.Stream {
 		apiReq.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
@@ -326,6 +331,278 @@ func (p *OpenAIProvider) buildAPIRequest(req ChatRequest) openAIRequest {
 	return apiReq
 }
 
+// MiMo model capabilities (static data from platform documentation)
+var mimoModelCapabilities = map[string]ModelInfo{
+	"mimo-v2.5-pro": {
+		ID: "mimo-v2.5-pro", Description: "复杂推理、深度分析、长文档处理",
+		ContextWindow: 1000000, MaxOutput: 128000,
+		Capabilities: []string{"text_generation", "deep_thinking", "streaming", "function_calling", "structured_output", "web_search"},
+	},
+	"mimo-v2-pro": {
+		ID: "mimo-v2-pro", Description: "复杂推理、深度分析、长文档处理",
+		ContextWindow: 1000000, MaxOutput: 128000,
+		Capabilities: []string{"text_generation", "deep_thinking", "streaming", "function_calling", "structured_output", "web_search"},
+	},
+	"mimo-v2.5": {
+		ID: "mimo-v2.5", Description: "图片、音频、视频内容理解",
+		ContextWindow: 1000000, MaxOutput: 128000,
+		Capabilities: []string{"text_generation", "multimodal", "deep_thinking", "streaming", "function_calling", "structured_output", "web_search"},
+	},
+	"mimo-v2-omni": {
+		ID: "mimo-v2-omni", Description: "图片、音频、视频内容理解",
+		ContextWindow: 256000, MaxOutput: 128000,
+		Capabilities: []string{"text_generation", "multimodal", "deep_thinking", "streaming", "function_calling", "structured_output", "web_search"},
+	},
+	"mimo-v2-flash": {
+		ID: "mimo-v2-flash", Description: "低成本、快速响应",
+		ContextWindow: 256000, MaxOutput: 64000,
+		Capabilities: []string{"text_generation", "deep_thinking", "streaming", "function_calling", "structured_output", "web_search"},
+	},
+	"mimo-v2.5-asr": {
+		ID: "mimo-v2.5-asr", Description: "语音转文字（支持中英双语）",
+		ContextWindow: 8000, MaxOutput: 2000,
+		Capabilities: []string{"speech_recognition"},
+	},
+	"mimo-v2.5-tts": {
+		ID: "mimo-v2.5-tts", Description: "文字转语音（标准预置音色）",
+		ContextWindow: 8000, MaxOutput: 8000,
+		Capabilities: []string{"speech_synthesis"},
+	},
+	"mimo-v2.5-tts-voiceclone": {
+		ID: "mimo-v2.5-tts-voiceclone", Description: "声音克隆（上传音频样本）",
+		ContextWindow: 8000, MaxOutput: 8000,
+		Capabilities: []string{"speech_synthesis", "voice_clone"},
+	},
+	"mimo-v2.5-tts-voicedesign": {
+		ID: "mimo-v2.5-tts-voicedesign", Description: "自定义音色设计",
+		ContextWindow: 8000, MaxOutput: 8000,
+		Capabilities: []string{"speech_synthesis", "voice_design"},
+	},
+	"mimo-v2-tts": {
+		ID: "mimo-v2-tts", Description: "文字转语音",
+		ContextWindow: 8000, MaxOutput: 8000,
+		Capabilities: []string{"speech_synthesis"},
+	},
+}
+
+// enrichModelInfo adds capabilities to model info if available
+func enrichModelInfo(model ModelInfo) ModelInfo {
+	if caps, ok := mimoModelCapabilities[model.ID]; ok {
+		model.Description = caps.Description
+		model.ContextWindow = caps.ContextWindow
+		model.MaxOutput = caps.MaxOutput
+		model.Capabilities = caps.Capabilities
+	}
+	return model
+}
+
+// Known compatible suffixes for API endpoints
+var knownCompatSuffixes = []string{
+	"/api/claudecode",
+	"/api/anthropic",
+	"/apps/anthropic",
+	"/api/coding",
+	"/claudecode",
+	"/anthropic",
+	"/step_plan",
+	"/coding",
+	"/claude",
+}
+
+// modelsEndpoint constructs the models endpoint URL from a base URL
+func modelsEndpoint(baseURL string) string {
+	cleaned := strings.TrimSuffix(baseURL, "/")
+	
+	// If already ends with /models, return as-is
+	if strings.HasSuffix(cleaned, "/models") {
+		return cleaned
+	}
+	
+	// If ends with /v1, append /models
+	if strings.HasSuffix(cleaned, "/v1") {
+		return cleaned + "/models"
+	}
+	
+	// Default: append /v1/models
+	return cleaned + "/v1/models"
+}
+
+// buildModelsURLCandidates builds candidate URLs for the models endpoint
+func buildModelsURLCandidates(baseURL string) []string {
+	candidates := []string{
+		modelsEndpoint(baseURL),
+	}
+	
+	// Check for known compat suffixes and try alternatives
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	for _, suffix := range knownCompatSuffixes {
+		if strings.HasSuffix(baseURL, suffix) {
+			withoutSuffix := strings.TrimSuffix(baseURL, suffix)
+			candidates = append(candidates, withoutSuffix+"/v1/models")
+			candidates = append(candidates, withoutSuffix+"/models")
+			break
+		}
+	}
+	
+	return candidates
+}
+
+// ListModels fetches available models from the API
+func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
+	candidates := buildModelsURLCandidates(p.apiBase)
+	
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no valid URL candidates")
+	}
+	
+	var lastErr error
+	
+	for _, url := range candidates {
+		models, err := p.fetchModelsFromURL(ctx, url)
+		if err == nil {
+			return models, nil
+		}
+		lastErr = err
+		
+		// If it's a 404/405, try next candidate
+		if strings.Contains(err.Error(), "status 404") || strings.Contains(err.Error(), "status 405") {
+			continue
+		}
+		// For other errors (auth, network), fail immediately
+		return nil, err
+	}
+	
+	if lastErr != nil {
+		return nil, fmt.Errorf("all endpoints failed: %w", lastErr)
+	}
+	return nil, fmt.Errorf("no models found")
+}
+
+// fetchModelsFromURL attempts to fetch models from a specific URL
+func (p *OpenAIProvider) fetchModelsFromURL(ctx context.Context, url string) ([]ModelInfo, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+	
+	resp, err := p.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode == 404 || resp.StatusCode == 405 {
+		return nil, fmt.Errorf("status %d", resp.StatusCode)
+	}
+	
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return nil, fmt.Errorf("authentication failed (status %d), please check your API key", resp.StatusCode)
+	}
+	
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	
+	// Try to parse response
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	
+	// Parse the payload using flexible parsing
+	var payload interface{}
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+	
+	modelIDs := parseModelPayload(payload)
+	if len(modelIDs) == 0 {
+		return nil, fmt.Errorf("no models found in response")
+	}
+	
+	// Convert to ModelInfo and enrich with capabilities
+	models := make([]ModelInfo, len(modelIDs))
+	for i, id := range modelIDs {
+		model := ModelInfo{ID: id}
+		models[i] = enrichModelInfo(model)
+	}
+	
+	return models, nil
+}
+
+// parseModelPayload extracts model IDs from various response formats
+// Supports: string array, object array, data/models/items nested, single object
+func parseModelPayload(payload interface{}) []string {
+	var ids []string
+	
+	switch v := payload.(type) {
+	case []interface{}:
+		// Array at top level
+		for _, item := range v {
+			ids = append(ids, extractModelID(item)...)
+		}
+	case map[string]interface{}:
+		// Object - try known keys
+		for _, key := range []string{"data", "models", "items"} {
+			if arr, ok := v[key].([]interface{}); ok {
+				for _, item := range arr {
+					ids = append(ids, extractModelID(item)...)
+				}
+				break
+			}
+		}
+		// If no array found, try single object
+		if len(ids) == 0 {
+			ids = append(ids, extractModelID(v)...)
+		}
+	case string:
+		// Single string
+		ids = append(ids, v)
+	}
+	
+	return deduplicateStrings(ids)
+}
+
+// extractModelID extracts model ID from an item (string or object)
+func extractModelID(item interface{}) []string {
+	var ids []string
+	
+	switch v := item.(type) {
+	case string:
+		// Direct string
+		if v != "" {
+			ids = append(ids, v)
+		}
+	case map[string]interface{}:
+		// Object - try known keys in priority order
+		for _, key := range []string{"id", "model", "name", "slug"} {
+			if val, ok := v[key].(string); ok && val != "" {
+				ids = append(ids, val)
+				break
+			}
+		}
+	}
+	
+	return ids
+}
+
+// deduplicateStrings removes duplicate strings
+func deduplicateStrings(input []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	for _, s := range input {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 func (p *OpenAIProvider) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
@@ -335,14 +612,15 @@ func (p *OpenAIProvider) setHeaders(req *http.Request) {
 // OpenAI API types (internal)
 
 type openAIRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Tools       []openAITool    `json:"tools,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-	TopP        float64         `json:"top_p,omitempty"`
-	Stream      bool            `json:"stream"`
-	StreamOptions *openAIStreamOptions `json:"stream_options,omitempty"`
+	Model           string          `json:"model"`
+	Messages        []openAIMessage `json:"messages"`
+	Tools           []openAITool    `json:"tools,omitempty"`
+	MaxTokens       int             `json:"max_tokens,omitempty"`
+	Temperature     float64         `json:"temperature,omitempty"`
+	TopP            float64         `json:"top_p,omitempty"`
+	Stream          bool            `json:"stream"`
+	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
+	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 }
 
 type openAIStreamOptions struct {

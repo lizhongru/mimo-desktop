@@ -1,7 +1,8 @@
-package desktop
+﻿package desktop
 
 import (
 	"context"
+	"time"
 	"fmt"
 	"os"
 	"os/exec"
@@ -140,6 +141,11 @@ func NewApp() (*App, error) {
 		mimoAgent.SetPlanningMode(agent.ModeAuto)
 	}
 
+	// Set reasoning level
+	if c.Agent.ReasoningLevel != "" {
+		mimoAgent.SetReasoningLevel(c.Agent.ReasoningLevel)
+	}
+
 	a.agent = mimoAgent
 
 	// 10. Open session store
@@ -252,8 +258,12 @@ func (a *App) OpenInExplorer(path string) error {
 func (a *App) registerConfirmCallback() {
 	a.guardrail.SetConfirmCallback(func(action safety.Action) (bool, error) {
 		runtime.EventsEmit(a.ctx, EventSafetyConfirm, action)
-		// Block until frontend responds
-		result := <-a.confirmChan
-		return result, nil
+		// Block until frontend responds (with timeout)
+		select {
+		case result := <-a.confirmChan:
+			return result, nil
+		case <-time.After(60 * time.Second):
+			return false, fmt.Errorf("safety confirmation timed out after 60s")
+		}
 	})
 }

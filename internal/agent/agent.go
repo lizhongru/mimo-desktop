@@ -42,6 +42,7 @@ type Agent struct {
 	maxContextTokens int
 	maxParallelTools int // 最大并行工具数
 	planningMode     PlanningMode // 规划模式
+	reasoningLevel   string       // reasoning effort level: low, medium, high
 	verbose          bool
 	confirmAll       bool // 是否确认所有操作
 }
@@ -121,6 +122,13 @@ func (a *Agent) SetPlanStepDoneCallback(fn func(*PlanStep)) {
 // SetPlanningMode sets the planning mode
 func (a *Agent) SetPlanningMode(mode PlanningMode) {
 	a.planningMode = mode
+}
+
+// SetReasoningLevel sets the reasoning effort level (low, medium, high)
+func (a *Agent) SetReasoningLevel(level string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.reasoningLevel = level
 }
 
 // CompressContext manually triggers context compression.
@@ -387,6 +395,7 @@ func (a *Agent) runPlanExecuteLoop(ctx context.Context, task string) (string, er
 		} else {
 			// Use LLM to describe what should be done
 			req := llm.ChatRequest{
+				ReasoningEffort: a.reasoningLevel,
 				Messages: []llm.Message{
 					{Role: llm.RoleSystem, Content: "你是一个任务执行助手。请执行以下步骤并描述结果。"},
 					{Role: llm.RoleUser, Content: fmt.Sprintf("任务: %s\n当前步骤: %s", task, step.Description)},
@@ -441,6 +450,7 @@ func (a *Agent) runPlanExecuteLoop(ctx context.Context, task string) (string, er
 	// Generate final summary
 	summaryPrompt := fmt.Sprintf("任务完成。执行计划:\n%s\n\n请总结执行结果。", plan.FormatPlan())
 	req := llm.ChatRequest{
+		ReasoningEffort: a.reasoningLevel,
 		Messages: []llm.Message{
 			{Role: llm.RoleSystem, Content: "请用中文简洁地总结任务执行结果。"},
 			{Role: llm.RoleUser, Content: summaryPrompt},
@@ -477,9 +487,10 @@ func (a *Agent) runLoop(ctx context.Context) (string, error) {
 	for i := 0; i < a.maxIterations; i++ {
 		// Call LLM
 		req := llm.ChatRequest{
-			Messages: a.messages,
-			Tools:    a.toolDefinitions(),
-			Stream:   false,
+			Messages:        a.messages,
+			Tools:           a.toolDefinitions(),
+			Stream:          false,
+			ReasoningEffort: a.reasoningLevel,
 		}
 
 		resp, err := a.gateway.Chat(ctx, req)
@@ -535,9 +546,10 @@ func (a *Agent) runStreamLoop(ctx context.Context) (string, error) {
 
 	for i := 0; i < a.maxIterations; i++ {
 		req := llm.ChatRequest{
-			Messages: a.messages,
-			Tools:    a.toolDefinitions(),
-			Stream:   true,
+			Messages:        a.messages,
+			Tools:           a.toolDefinitions(),
+			Stream:          true,
+			ReasoningEffort: a.reasoningLevel,
 		}
 
 		ch, err := a.gateway.ChatStream(ctx, req)
@@ -852,6 +864,7 @@ func (a *Agent) compressContext(ctx context.Context) {
 
 	// Call LLM for summarization (non-streaming, lightweight)
 	req := llm.ChatRequest{
+		ReasoningEffort: a.reasoningLevel,
 		Messages: []llm.Message{
 			{Role: llm.RoleSystem, Content: "你是一个对话摘要助手，擅长将长对话压缩为简洁的摘要。"},
 			{Role: llm.RoleUser, Content: summaryPrompt},
@@ -950,6 +963,7 @@ func (a *Agent) compressContextForce(ctx context.Context) {
 	}
 
 	req := llm.ChatRequest{
+		ReasoningEffort: a.reasoningLevel,
 		Messages: []llm.Message{
 			{Role: llm.RoleSystem, Content: "你是一个对话摘要助手，擅长将长对话压缩为简洁的摘要。"},
 			{Role: llm.RoleUser, Content: summaryPrompt},

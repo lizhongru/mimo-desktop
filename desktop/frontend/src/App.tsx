@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAgent } from "./hooks/useAgent";
 import { useChatStore } from "./stores/chatStore";
@@ -22,6 +22,7 @@ declare global {
           GetModelName: () => Promise<string>;
           GetVersion: () => Promise<Record<string, string>>;
           CompressContext: () => Promise<{ before: number; after: number }>;
+          ExportChat: (messages: Array<{ role: string; content: string }>) => Promise<void>;
           // Project info
           GetWorkingDir: () => Promise<string>;
           // Tools
@@ -71,17 +72,25 @@ declare global {
             language: string;
             theme: string;
             userName: string;
-            models: Record<string, { apiBase: string; model: string; maxTokens: number; temperature: number }>;
+            models: Record<string, { 
+              provider: string; website: string; apiBase: string; apiKey: string;
+              model: string; models: string[]; fallback: string;
+              maxTokens: number; temperature: number; topP: number;
+              streaming: boolean; vision: boolean; tools: boolean;
+            }>;
             safety: { level: string; permission: string };
-            agent: { maxIterations: number; planningMode: string; showTokenUsage: boolean };
+            agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean };
           }>;
           SetTheme: (theme: string) => Promise<void>;
           SetLanguage: (lang: string) => Promise<void>;
           SetDefaultModel: (name: string) => Promise<void>;
-          AddModel: (name: string, apiBase: string, apiKey: string, model: string, maxTokens: number, temperature: number) => Promise<void>;
+          AddModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
+          UpdateModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
           RemoveModel: (name: string) => Promise<void>;
           SetSafetyLevel: (level: string) => Promise<void>;
           SetPlanningMode: (mode: string) => Promise<void>;
+          SetPermission: (perm: string) => Promise<void>;
+          SetReasoningLevel: (level: string) => Promise<void>;
           // Window controls
           WindowMinimise: () => Promise<void>;
           WindowMaximise: () => Promise<void>;
@@ -89,6 +98,11 @@ declare global {
           WindowIsMaximised: () => Promise<boolean>;
           // Explorer
           OpenInExplorer: (path: string) => Promise<void>;
+          // Directory picker
+          SelectDirectory: () => Promise<string>;
+          // Remote model listing
+          ListRemoteModels: (modelName: string) => Promise<Array<{id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[]}>>;
+          ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[]}>>;
         };
       };
     };
@@ -96,11 +110,10 @@ declare global {
 }
 
 export default function App() {
-  const [modelName, setModelName] = useState("mimo");
+  const currentModel = useSettingsStore((s) => s.currentModel);
   useAgent();
 
   useEffect(() => {
-    window.go?.desktop?.App?.GetModelName?.().then(setModelName).catch(() => {});
     // Load sessions on mount
     window.go?.desktop?.App?.ListSessions?.(30).then((list) => {
       useSessionStore.getState().setSessions(list || []);
@@ -108,21 +121,42 @@ export default function App() {
     // Create initial session and track its ID
     window.go?.desktop?.App?.CreateNewSession?.().then((id) => {
       useSessionStore.getState().setCurrentSessionId(id);
-      (window as Record<string, unknown>).__currentSessionId = id;
     }).catch(console.error);
     // Initialize settings from config
     window.go?.desktop?.App?.GetConfig?.().then((cfg) => {
       useSettingsStore.getState().initFromConfig({
         theme: cfg.theme,
         language: cfg.language,
+        defaultModel: cfg.defaultModel,
+        models: cfg.models,
+        planningMode: cfg.agent?.planningMode,
+        safetyLevel: cfg.safety?.level,
+        permission: cfg.agent?.permission,
+        reasoningLevel: cfg.agent?.reasoningLevel,
       });
     }).catch(console.error);
   }, []);
 
   const handleSend = useCallback((message: string) => {
+    // If current session is not in the sidebar list, add it immediately
+    const sessStore = useSessionStore.getState();
+    const sid = sessStore.currentSessionId;
+    if (sid && !sessStore.sessions.find((s) => s.id === sid)) {
+      sessStore.addSession({
+        id: sid,
+        modelName: "",
+        userName: "",
+        lastMessage: message,
+        workingDir: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    sessStore.setStreamingSessionId(sid);
     useChatStore.getState().addUserMessage(message);
     window.go?.desktop?.App?.SendMessage?.(message).catch((err) => {
       console.error("SendMessage failed:", err);
+      useSessionStore.getState().setStreamingSessionId(null);
       useChatStore.getState().finalizeResponse(`${t("error_prefix")}: ${err}`, 0);
     });
   }, []);
@@ -135,7 +169,6 @@ export default function App() {
     // Create new session (auto-save already happened in chat:done)
     window.go?.desktop?.App?.CreateNewSession?.().then((id) => {
       useSessionStore.getState().setCurrentSessionId(id);
-      (window as Record<string, unknown>).__currentSessionId = id;
       useChatStore.getState().clearMessages();
       useActivityStore.getState().clear();
     }).catch(console.error);
@@ -144,26 +177,53 @@ export default function App() {
   const handleLoadSession = useCallback((id: string) => {
     window.go?.desktop?.App?.LoadSession?.(id).then((data) => {
       useSessionStore.getState().setCurrentSessionId(id);
-      (window as Record<string, unknown>).__currentSessionId = id;
       useChatStore.getState().clearMessages();
       useActivityStore.getState().clear();
       // Restore messages to chat store
       if (data?.messages) {
         for (const msg of data.messages) {
-          useChatStore.getState().addRestoredMessage(msg);
+          useChatStore.getState().addRestoredMessage(msg as { role: "user" | "assistant"; content: string; thinking?: string; toolLines?: string[]; tokens?: number; toolCalls?: number; durationMs?: number });
         }
       }
     }).catch(console.error);
   }, []);
 
-  const handleDeleteSession = useCallback((id: string) => {
-    window.go?.desktop?.App?.DeleteSession?.(id).then(() => {
-      useSessionStore.getState().removeSession(id);
-      if (useSessionStore.getState().currentSessionId === id) {
-        useChatStore.getState().clearMessages();
-        useSessionStore.getState().setCurrentSessionId(null);
+  const handleDeleteSession = useCallback(async (id: string) => {
+    await window.go?.desktop?.App?.DeleteSession?.(id);
+    useSessionStore.getState().removeSession(id);
+    if (useSessionStore.getState().currentSessionId === id) {
+      useChatStore.getState().clearMessages();
+      useSessionStore.getState().setCurrentSessionId(null);
+    }
+  }, []);
+
+  const [toast, setToast] = useState<string | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+
+  const handleSelectWorkspace = useCallback((dir: string) => {
+    setSelectedWorkspace(dir);
+  }, []);
+
+  const handleExportSession = useCallback(async (id: string) => {
+    useSessionStore.getState().setExportingSessionId(id);
+    try {
+      const data = await window.go?.desktop?.App?.LoadSession?.(id);
+      if (!data?.messages?.length) {
+        setToast(t("export_empty"));
+        return;
       }
-    }).catch(console.error);
+      const exportMsgs = data.messages.map((m) => ({ role: m.role, content: m.content }));
+      await window.go?.desktop?.App?.ExportChat?.(exportMsgs);
+      setToast(t("export_success"));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("cancelled")) {
+        setToast(t("export_failed"));
+      }
+    } finally {
+      useSessionStore.getState().setExportingSessionId(null);
+      setTimeout(() => setToast(null), 2500);
+    }
   }, []);
 
   const handleConfirmApprove = useCallback(() => {
@@ -180,6 +240,17 @@ export default function App() {
 
   // Keyboard shortcuts
   useEffect(() => {
+    // Regenerate: re-send the last user message
+    const handleRegenerate = () => {
+      const msgs = useChatStore.getState().messages;
+      const lastUser = [...msgs].reverse().find((m) => m.role === "user");
+      if (lastUser) {
+        const lastUserIdx = msgs.lastIndexOf(lastUser);
+        useChatStore.setState({ messages: msgs.slice(0, lastUserIdx) });
+        handleSend(lastUser.content);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape: cancel or close dialog
       if (e.key === "Escape") {
@@ -209,24 +280,43 @@ export default function App() {
             e.preventDefault();
             handleNewChat();
             break;
+          case "k":
+            e.preventDefault();
+            if (!useChatStore.getState().isCompressing && !useChatStore.getState().isStreaming) {
+              window.go?.desktop?.App?.CompressContext?.().catch(console.error);
+            }
+            break;
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleCancel, handleNewChat]);
+    window.addEventListener("mimo:regenerate", handleRegenerate);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mimo:regenerate", handleRegenerate);
+    };
+  }, [handleCancel, handleNewChat, handleSend]);
 
   return (
-    <AppLayout
-      modelName={modelName}
-      onSend={handleSend}
-      onCancel={handleCancel}
-      onNewChat={handleNewChat}
-      onLoadSession={handleLoadSession}
-      onDeleteSession={handleDeleteSession}
-      onConfirmApprove={handleConfirmApprove}
-      onConfirmDeny={handleConfirmDeny}
-      onConfirmApproveAll={handleConfirmApproveAll}
-    />
+    <>
+      <AppLayout
+        modelName={currentModel}
+        onSend={handleSend}
+        onCancel={handleCancel}
+        onNewChat={handleNewChat}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={handleDeleteSession}
+        onExportSession={handleExportSession}
+        onConfirmApprove={handleConfirmApprove}
+        onConfirmDeny={handleConfirmDeny}
+        onConfirmApproveAll={handleConfirmApproveAll}
+        onSelectWorkspace={handleSelectWorkspace}
+      />
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-elevated border border-bdr text-txt text-sm px-4 py-2 rounded-lg shadow-lg animate-fade-in">
+          {toast}
+        </div>
+      )}
+    </>
   );
 }

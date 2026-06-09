@@ -1,4 +1,4 @@
-package session
+﻿package session
 import (
 	"database/sql"
 	"encoding/json"
@@ -62,6 +62,12 @@ func Open() (*Store, error) {
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("cannot set WAL mode: %w", err)
+	}
+
+	// Enable foreign key constraints for CASCADE deletes
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("cannot enable foreign keys: %w", err)
 	}
 
 	if err := migrate(db); err != nil {
@@ -244,8 +250,20 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 
 // DeleteSession removes a session and its messages
 func (s *Store) DeleteSession(id string) error {
-	_, err := s.db.Exec("DELETE FROM sessions WHERE id = ?", id)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Explicitly delete messages first (in case foreign_keys is not enabled)
+	if _, err := tx.Exec("DELETE FROM messages WHERE session_id = ?", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM sessions WHERE id = ?", id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // RenameSession updates the last_message (display title) of a session.

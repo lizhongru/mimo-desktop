@@ -104,19 +104,6 @@ func (a *App) CreateNewSession() string {
 	return a.currentSessionID
 }
 
-// SaveCurrentSession saves the current conversation to the session store.
-func (a *App) SaveCurrentSession() error {
-	a.mu.Lock()
-	sid := a.currentSessionID
-	a.mu.Unlock()
-	if a.sessionStore == nil || sid == "" {
-		return nil
-	}
-	// Build session messages from agent's internal state
-	// For now, we save what we have — the frontend sends messages via SendMessage
-	// and we track them on the Go side
-	return nil
-}
 
 // DeleteSession removes a session from the store.
 func (a *App) DeleteSession(sessionID string) error {
@@ -152,6 +139,9 @@ func (a *App) SaveSessionFromFrontend(sessionID string, messages []ChatMessageDT
 			CreatedAt:  time.Now(),
 		}
 	}
-	workingDir, _ := os.Getwd()
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
 	return a.sessionStore.SaveSession(sessionID, a.cfg.DefaultModel, a.cfg.UserName, workingDir, msgs)
 }

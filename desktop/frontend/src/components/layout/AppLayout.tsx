@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useActivityStore } from "../../stores/activityStore";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
@@ -9,6 +10,7 @@ import { StatusBar } from "../chat/StatusBar";
 import { ConfirmDialog } from "../confirm/ConfirmDialog";
 import { ToolsViewer } from "../common/ToolsViewer";
 import { SettingsPage } from "../settings/SettingsPage";
+import { WelcomeView } from "../welcome/WelcomeView";
 import { useChatStore } from "../../stores/chatStore";
 import {
   PanelLeft,
@@ -18,6 +20,7 @@ import {
   X,
   Copy,
   Wrench,
+  Paperclip,
 } from "lucide-react";
 import { t } from "../../lib/i18n";
 
@@ -32,10 +35,12 @@ interface Props {
   onCancel: () => void;
   onNewChat: () => void;
   onLoadSession: (id: string) => void;
-  onDeleteSession: (id: string) => void;
+  onDeleteSession: (id: string) => Promise<void>;
+  onExportSession: (id: string) => Promise<void>;
   onConfirmApprove: () => void;
   onConfirmDeny: () => void;
   onConfirmApproveAll: () => void;
+  onSelectWorkspace: (dir: string) => void;
 }
 
 export function AppLayout({
@@ -45,16 +50,21 @@ export function AppLayout({
   onNewChat,
   onLoadSession,
   onDeleteSession,
+  onExportSession,
   onConfirmApprove,
   onConfirmDeny,
   onConfirmApproveAll,
+  onSelectWorkspace,
 }: Props) {
+  useSettingsStore((s) => s.language);
+  const messages = useChatStore((s) => s.messages);
   const leftOpen = useSessionStore((s) => s.leftSidebarOpen);
   const rightOpen = useActivityStore((s) => s.rightSidebarOpen);
   const confirmAction = useChatStore((s) => s.confirmAction);
   const usage = useChatStore((s) => s.usage);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [isMaximised, setIsMaximised] = useState(false);
 
   useEffect(() => {
@@ -76,16 +86,35 @@ export function AppLayout({
     }, 100);
   }, []);
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes("Files")) setDragOver(true);
+  }, []);
+
   const handleClose = useCallback(() => {
     window.go?.desktop?.App?.WindowClose?.().catch(console.error);
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-root text-txt select-none">
+    <div
+      className="h-screen flex flex-col bg-root text-txt select-none relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={(e) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); }}
+    >
+      {dragOver && (
+        <div className="absolute inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="bg-surface border-2 border-dashed border-accent rounded-2xl px-8 py-6 flex flex-col items-center gap-3 animate-fade-in">
+            <Paperclip className="w-8 h-8 text-accent" />
+            <span className="text-sm font-medium text-txt">{t("drop_to_add")}</span>
+          </div>
+        </div>
+      )}
       {/* Modern Title Bar */}
-      <div className="h-10 flex items-center border-b border-bdr-sub/60 bg-root flex-shrink-0 drag-region">
+      <div className="relative h-10 flex items-center border-b border-bdr-div bg-root flex-shrink-0 drag-region">
         {/* Left: sidebar toggle */}
-        <div className="flex items-center gap-1 pl-3 no-drag">
+        <div className="flex items-center gap-1 pl-3 no-drag z-10">
           <button
             onClick={() => useSessionStore.getState().toggleLeftSidebar()}
             className={`p-1.5 rounded-md hover:bg-elevated/80 transition-colors cursor-pointer no-drag ${
@@ -97,23 +126,15 @@ export function AppLayout({
           </button>
         </div>
 
-        {/* Center: App title + model + tokens */}
-        <div className="flex-1 flex items-center justify-center gap-2.5 drag-region">
+        {/* Center: App title — absolute centered */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none drag-region">
           <span className="text-[13px] font-semibold tracking-wide text-txt">
-            MiMo
+            {t("app_name")}
           </span>
-          <span className="text-[10px] px-2 py-[2px] rounded-full bg-elevated/80 text-txt-g font-mono border border-bdr/50">
-            {modelName}
-          </span>
-          {usage && (
-            <span className="text-[10px] text-txt-m font-mono">
-              {formatTokens(usage.totalTokens)} tokens
-            </span>
-          )}
         </div>
 
         {/* Right: sidebar toggle + window controls */}
-        <div className="flex items-center no-drag">
+        <div className="flex items-center no-drag z-10 ml-auto">
           <button
             onClick={() => setToolsOpen(true)}
             className={`p-1.5 rounded-md hover:bg-elevated/80 transition-colors cursor-pointer text-txt-g hover:text-txt`}
@@ -121,6 +142,7 @@ export function AppLayout({
           >
             <Wrench className="w-[15px] h-[15px]" />
           </button>
+
           <button
             onClick={() => useActivityStore.getState().toggleRightSidebar()}
             className={`p-1.5 rounded-md hover:bg-elevated/80 transition-colors cursor-pointer ${
@@ -132,7 +154,7 @@ export function AppLayout({
           </button>
 
           {/* Divider */}
-          <div className="w-px h-4 bg-bdr mx-1" />
+          <div className="w-px h-4 bg-bdr-div mx-1" />
 
           {/* Window controls */}
           <button
@@ -167,7 +189,7 @@ export function AppLayout({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
         <div
-          className={`border-r border-bdr bg-surface/70 transition-all duration-200 flex-shrink-0 overflow-hidden ${
+          className={`border-r border-bdr bg-sidebar transition-all duration-200 flex-shrink-0 overflow-hidden ${
             leftOpen ? "w-[260px]" : "w-0"
           }`}
         >
@@ -176,6 +198,7 @@ export function AppLayout({
               onNewChat={onNewChat}
               onLoadSession={onLoadSession}
               onDeleteSession={onDeleteSession}
+              onExportSession={onExportSession}
               onOpenSettings={() => setSettingsOpen(true)}
             />
           )}
@@ -183,14 +206,20 @@ export function AppLayout({
 
         {/* Center: Chat */}
         <div className="flex-1 flex flex-col min-w-0">
-          <MessageList />
-          <ChatInput onSend={onSend} onCancel={onCancel} />
-          <StatusBar modelName={modelName} />
+          {messages.length === 0 ? (
+            <WelcomeView onSend={onSend} onSelectWorkspace={onSelectWorkspace} />
+          ) : (
+            <>
+              <MessageList />
+              <ChatInput onSend={onSend} onCancel={onCancel} />
+              <StatusBar modelName={modelName} />
+            </>
+          )}
         </div>
 
         {/* Right Sidebar */}
         <div
-          className={`border-l border-bdr bg-surface/70 transition-all duration-200 flex-shrink-0 overflow-hidden ${
+          className={`border-l border-bdr bg-surface transition-all duration-200 flex-shrink-0 overflow-hidden ${
             rightOpen ? "w-[320px]" : "w-0"
           }`}
         >
@@ -209,23 +238,21 @@ export function AppLayout({
       <ToolsViewer open={toolsOpen} onClose={() => setToolsOpen(false)} />
 
       {/* Confirm Dialog (global overlay) */}
-      {confirmAction && (
-        <ConfirmDialog
-          action={confirmAction}
-          onApprove={() => {
-            onConfirmApprove();
-            useChatStore.getState().setConfirmAction(null);
-          }}
-          onDeny={() => {
-            onConfirmDeny();
-            useChatStore.getState().setConfirmAction(null);
-          }}
-          onApproveAll={() => {
-            onConfirmApproveAll();
-            useChatStore.getState().setConfirmAction(null);
-          }}
-        />
-      )}
+      <ConfirmDialog
+        action={confirmAction}
+        onApprove={() => {
+          onConfirmApprove();
+          useChatStore.getState().setConfirmAction(null);
+        }}
+        onDeny={() => {
+          onConfirmDeny();
+          useChatStore.getState().setConfirmAction(null);
+        }}
+        onApproveAll={() => {
+          onConfirmApproveAll();
+          useChatStore.getState().setConfirmAction(null);
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { EventsOn, EVENTS } from "../lib/events";
 import { useChatStore } from "../stores/chatStore";
 import { useActivityStore } from "../stores/activityStore";
+import { useSessionStore } from "../stores/sessionStore";
 import { t } from "../lib/i18n";
 import type { AgentUsage, ConfirmAction } from "../lib/types";
 
@@ -67,11 +68,21 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.COMPRESSING, () => {
+        store.getState().setCompressing(true);
+      })
+    );
+
+    unsubs.push(
+      EventsOn(EVENTS.COMPRESS_DONE, (...args: unknown[]) => {
+        const data = args[0] as { before: number; after: number };
+        store.getState().setCompressing(false);
+        const saved = data.before - data.after;
+        const pct = data.before > 0 ? Math.round((saved / data.before) * 100) : 0;
         activity.getState().addEntry({
           type: "tool_call",
-          name: "compress_context",
-          detail: t("compressing_context"),
-          status: "running",
+          name: "compress_done",
+          detail: `${t("compress_done")} ${data.before} → ${data.after} (-${saved}, -${pct}%)`,
+          status: "done",
         });
       })
     );
@@ -133,12 +144,18 @@ export function useAgent() {
       EventsOn(EVENTS.CHAT_DONE, (...args: unknown[]) => {
         const data = args[0] as { response: string; duration: number };
         store.getState().finalizeResponse(data.response, data.duration);
+        useSessionStore.getState().setStreamingSessionId(null);
         // Auto-save session
         try {
           const msgs = store.getState().messages;
-          const sid = (window as Record<string, unknown>).__currentSessionId as string | undefined;
+          const sid = useSessionStore.getState().currentSessionId;
           if (sid && msgs.length > 0) {
-            window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).catch((err) => {
+            window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).then(() => {
+              // Refresh session list so the new session appears in sidebar
+              window.go?.desktop?.App?.ListSessions?.(30).then((list) => {
+                useSessionStore.getState().setSessions(list || []);
+              }).catch(console.error);
+            }).catch((err) => {
               console.warn("Auto-save session failed:", err);
             });
           }
@@ -151,12 +168,14 @@ export function useAgent() {
     unsubs.push(
       EventsOn(EVENTS.CHAT_ERROR, (...args: unknown[]) => {
         console.error("Chat error:", args[0]);
+        useSessionStore.getState().setStreamingSessionId(null);
         store.getState().finalizeResponse(`${t("error_prefix")}: ${args[0]}`, 0);
       })
     );
 
     unsubs.push(
       EventsOn(EVENTS.CHAT_CANCELLED, () => {
+        useSessionStore.getState().setStreamingSessionId(null);
         store.getState().resetStreamState();
       })
     );

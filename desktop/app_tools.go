@@ -1,9 +1,22 @@
-package desktop
+﻿package desktop
 
 import (
 	"os"
 	"strings"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// SelectDirectory opens a directory picker dialog and returns the selected path.
+func (a *App) SelectDirectory() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Workspace Directory",
+	})
+	if err != nil {
+		return "", err
+	}
+	return dir, nil
+}
 
 // GetWorkingDir returns the current working directory.
 func (a *App) GetWorkingDir() string {

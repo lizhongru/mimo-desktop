@@ -1,4 +1,4 @@
-package llm
+﻿package llm
 
 import (
 	"context"
@@ -87,4 +87,13 @@ func (g *Gateway) ListModels() []string {
 		models = append(models, name)
 	}
 	return models
+}
+
+// ListRemoteModels fetches available models from the specified provider API
+func (g *Gateway) ListRemoteModels(ctx context.Context, modelName string) ([]ModelInfo, error) {
+	provider, err := g.GetProvider(modelName)
+	if err != nil {
+		return nil, err
+	}
+	return provider.ListModels(ctx)
 }

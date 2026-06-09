@@ -10,6 +10,7 @@ interface ChatState {
   currentToolCalls: ToolCallEvent[];
   usage: AgentUsage | null;
   confirmAction: ConfirmAction | null;
+  isCompressing: boolean;
 
   // Actions
   addUserMessage: (content: string) => void;
@@ -29,9 +30,11 @@ interface ChatState {
   finalizeResponse: (response: string, duration: number) => void;
   setUsage: (usage: AgentUsage) => void;
   setConfirmAction: (action: ConfirmAction | null) => void;
+  setCompressing: (compressing: boolean) => void;
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
   resetStreamState: () => void;
+  deleteMessage: (id: string) => void;
 }
 
 let nextId = 1;
@@ -48,6 +51,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentToolCalls: [],
   usage: null,
   confirmAction: null,
+  isCompressing: false,
 
   addUserMessage: (content) => {
     const msg: ChatMessage = {
@@ -141,6 +145,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setUsage: (usage) => set({ usage }),
 
   setConfirmAction: (action) => set({ confirmAction: action }),
+  setCompressing: (compressing) => set({ isCompressing: compressing }),
 
   setStreaming: (streaming) => set({ isStreaming: streaming }),
 
@@ -163,4 +168,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentDelta: "",
       currentToolCalls: [],
     }),
+
+  deleteMessage: (id) =>
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== id),
+    })),
 }));

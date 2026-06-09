@@ -3,6 +3,8 @@ export namespace desktop {
 	export class AgentDTO {
 	    maxIterations: number;
 	    planningMode: string;
+	    permission: string;
+	    reasoningLevel: string;
 	    showTokenUsage: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -13,6 +15,8 @@ export namespace desktop {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.maxIterations = source["maxIterations"];
 	        this.planningMode = source["planningMode"];
+	        this.permission = source["permission"];
+	        this.reasoningLevel = source["reasoningLevel"];
 	        this.showTokenUsage = source["showTokenUsage"];
 	    }
 	}
@@ -31,10 +35,19 @@ export namespace desktop {
 	    }
 	}
 	export class ModelDTO {
+	    provider: string;
+	    website: string;
 	    apiBase: string;
+	    apiKey: string;
 	    model: string;
+	    models: string[];
+	    fallback: string;
 	    maxTokens: number;
 	    temperature: number;
+	    topP: number;
+	    streaming: boolean;
+	    vision: boolean;
+	    tools: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelDTO(source);
@@ -42,10 +55,19 @@ export namespace desktop {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.website = source["website"];
 	        this.apiBase = source["apiBase"];
+	        this.apiKey = source["apiKey"];
 	        this.model = source["model"];
+	        this.models = source["models"];
+	        this.fallback = source["fallback"];
 	        this.maxTokens = source["maxTokens"];
 	        this.temperature = source["temperature"];
+	        this.topP = source["topP"];
+	        this.streaming = source["streaming"];
+	        this.vision = source["vision"];
+	        this.tools = source["tools"];
 	    }
 	}
 	export class AppConfigDTO {
@@ -112,6 +134,20 @@ export namespace desktop {
 	        this.tokens = source["tokens"];
 	        this.toolCalls = source["toolCalls"];
 	        this.durationMs = source["durationMs"];
+	    }
+	}
+	export class ExportMessage {
+	    role: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = source["content"];
 	    }
 	}
 	export class MCPServerInfo {
@@ -210,6 +246,33 @@ export namespace desktop {
 	        this.safetyLevel = source["safetyLevel"];
 	        this.isMcp = source["isMcp"];
 	        this.serverName = source["serverName"];
+	    }
+	}
+
+}
+
+export namespace llm {
+	
+	export class ModelInfo {
+	    id: string;
+	    owned_by?: string;
+	    description?: string;
+	    context_window?: number;
+	    max_output?: number;
+	    capabilities?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.owned_by = source["owned_by"];
+	        this.description = source["description"];
+	        this.context_window = source["context_window"];
+	        this.max_output = source["max_output"];
+	        this.capabilities = source["capabilities"];
 	    }
 	}
 

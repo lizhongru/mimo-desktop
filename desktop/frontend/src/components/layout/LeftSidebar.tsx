@@ -15,14 +15,26 @@ import {
   PinOff,
   FolderInput,
   Edit3,
+  Keyboard,
+  HelpCircle,
+  Info,
+  Languages,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useSessionStore, type SessionItem } from "../../stores/sessionStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { t } from "../../lib/i18n";
+import { ShortcutsPanel } from "../common/ShortcutsPanel";
+import { HelpLogPanel } from "../common/HelpLogPanel";
+import { AboutPanel } from "../common/AboutPanel";
+import { animateThemeSwitch } from "../../lib/theme-transition";
 
 interface Props {
   onNewChat: () => void;
   onLoadSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onExportSession?: (id: string) => Promise<void>;
   onOpenSettings: () => void;
 }
 
@@ -212,6 +224,15 @@ export function LeftSidebar({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pinnedDirs, setPinnedDirs] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [helpLogOpen, setHelpLogOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [langPanelOpen, setLangPanelOpen] = useState(false);
+  const theme = useSettingsStore((s) => s.theme);
+  const language = useSettingsStore((s) => s.language);
+  const setTheme = useSettingsStore((s) => s.setTheme);
+  const setLanguage = useSettingsStore((s) => s.setLanguage);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
@@ -448,20 +469,8 @@ export function LeftSidebar({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-bdr-sub p-2.5 flex items-center gap-2 text-xs">
-        <div className="flex items-center gap-1.5 text-txt-m flex-1 min-w-0" title={workingDir}>
-          <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="truncate">{getDirName(workingDir) || "..."}</span>
-        </div>
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-md text-txt-g hover:text-txt hover:bg-elevated transition-colors cursor-pointer flex-shrink-0"
-          title={t("settings")}
-        >
-          <Settings className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      {/* Footer ? User profile menu */}
+      <UserProfileFooter onOpenSettings={onOpenSettings} workingDir={workingDir} />
 
       {/* Context Menu */}
       {contextMenu && (
@@ -552,6 +561,198 @@ export function LeftSidebar({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function UserProfileFooter({
+  onOpenSettings,
+  workingDir,
+}: {
+  onOpenSettings: () => void;
+  workingDir: string;
+}) {
+  const language = useSettingsStore((s) => s.language);
+  const theme = useSettingsStore((s) => s.theme);
+  const setLanguage = useSettingsStore((s) => s.setLanguage);
+  const setTheme = useSettingsStore((s) => s.setTheme);
+
+  const footerRef = useRef<HTMLDivElement>(null);
+  const [rawMenuOpen, setRawMenuOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [helpLogOpen, setHelpLogOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [langPanelOpen, setLangPanelOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ left: 0, bottom: 0 });
+
+  const close = () => {
+    setRawMenuOpen(false);
+    setLangPanelOpen(false);
+  };
+
+  const openMenu = () => {
+    if (footerRef.current) {
+      const rect = footerRef.current.getBoundingClientRect();
+      setMenuPos({ left: rect.left + 8, bottom: window.innerHeight - rect.top + 8 });
+    }
+    setRawMenuOpen(true);
+  };
+
+  // Click outside to close
+  useEffect(() => {
+    if (!rawMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (footerRef.current && !footerRef.current.contains(e.target as Node)) {
+        close();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [rawMenuOpen]);
+
+  return (
+    <div ref={footerRef} className="relative border-t border-bdr-sub">
+      <button
+        onClick={() => (rawMenuOpen ? close() : openMenu())}
+        className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md hover:bg-elevated transition-colors cursor-pointer"
+      >
+        <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+          <span className="text-xs font-bold text-accent">
+            {(workingDir || "U").charAt(0).toUpperCase()}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-xs font-medium text-txt truncate">
+            {getDirName(workingDir) || "MiMo Desktop"}
+          </div>
+          <div className="text-[10px] text-txt-g truncate">{workingDir || "No workspace"}</div>
+        </div>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-txt-g transition-transform ${rawMenuOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {rawMenuOpen && (
+        <div
+          className="fixed z-[100]"
+          style={{ left: menuPos.left, bottom: menuPos.bottom }}
+        >
+          {/* Main menu 170px */}
+          <div className="w-[170px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
+            {/* Settings */}
+            <button
+              onClick={() => { onOpenSettings(); close(); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+            >
+              <Settings className="w-3.5 h-3.5 text-txt-g" />
+              {t("settings")}
+            </button>
+
+            {/* Shortcuts */}
+            <button
+              onClick={() => { close(); setShortcutsOpen(true); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+            >
+              <Keyboard className="w-3.5 h-3.5 text-txt-g" />
+              {t("shortcuts")}
+            </button>
+
+            {/* Help Log */}
+            <button
+              onClick={() => { close(); setHelpLogOpen(true); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-txt-g" />
+              {t("help_log")}
+            </button>
+
+            {/* About */}
+            <button
+              onClick={() => { close(); setAboutOpen(true); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+            >
+              <Info className="w-3.5 h-3.5 text-txt-g" />
+              {t("about")}
+            </button>
+
+            {/* Divider */}
+            <div className="border-t border-bdr-sub my-1 mx-1" />
+
+            {/* Language */}
+            <div
+              className="relative"
+              onMouseEnter={() => setLangPanelOpen(true)}
+              onMouseLeave={() => setLangPanelOpen(false)}
+            >
+              <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md">
+                <span className="flex items-center gap-2.5">
+                  <Languages className="w-3.5 h-3.5 text-txt-g" />
+                  {t("language")}
+                </span>
+                <span className="flex items-center gap-1 text-txt-m">
+                  {language === "zh" ? t("chinese") : t("english")}
+                  <ChevronRight className="w-3 h-3" />
+                </span>
+              </div>
+
+              {langPanelOpen && (
+                <div className="absolute left-full bottom-0 w-[120px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
+                  <div className="px-2.5 py-1 text-[10px] text-txt-g uppercase tracking-wider">
+                    {t("language")}
+                  </div>
+                  <button
+                    onClick={() => { setLanguage("zh"); close(); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${
+                      language === "zh" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
+                    }`}
+                  >
+                    {t("chinese")}
+                    {language === "zh" && <span className="text-accent">&#10003;</span>}
+                  </button>
+                  <button
+                    onClick={() => { setLanguage("en"); close(); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${
+                      language === "en" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
+                    }`}
+                  >
+                    {t("english")}
+                    {language === "en" && <span className="text-accent">&#10003;</span>}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Theme toggle */}
+            <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 rounded-md">
+              <span className="flex items-center gap-2.5">
+                {theme === "dark" ? (
+                  <Moon className="w-3.5 h-3.5 text-txt-g" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-txt-g" />
+                )}
+                {t("theme")}
+              </span>
+              <button
+                onClick={(e) => setTheme(theme === "dark" ? "light" : "dark", e.clientX, e.clientY)}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer flex-shrink-0 ${
+                  theme === "dark" ? "bg-accent" : "bg-elevated border border-bdr"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                    theme === "dark" ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <HelpLogPanel open={helpLogOpen} onClose={() => setHelpLogOpen(false)} />
+      <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { ConfirmAction } from "../../lib/types";
 import { t } from "../../lib/i18n";
 
 interface Props {
-  action: ConfirmAction;
+  action: ConfirmAction | null;
   onApprove: () => void;
   onDeny: () => void;
   onApproveAll: () => void;
@@ -26,8 +26,8 @@ function levelColor(level: string): string {
 
 export function ConfirmDialog({ action, onApprove, onDeny, onApproveAll }: Props) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-surface border border-bdr rounded-xl w-full max-w-md mx-4 shadow-2xl">
+    <div className={`modal-overlay ${action ? "is-open" : ""}`}>
+      <div className="modal-dialog w-full max-w-md mx-4">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-bdr-sub">
           <Shield className="w-5 h-5 text-amber-400" />
@@ -37,59 +37,61 @@ export function ConfirmDialog({ action, onApprove, onDeny, onApproveAll }: Props
         </div>
 
         {/* Content */}
-        <div className="px-5 py-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded border ${levelColor(
-                action.level
-              )}`}
-            >
-              {action.level?.toUpperCase() || t("unknown")}
-            </span>
-            <span className="text-sm text-txt-2 font-mono">
-              {action.tool}
-            </span>
-          </div>
-
-          <p className="text-sm text-txt-g">{action.description}</p>
-
-          {action.params && Object.keys(action.params).length > 0 && (
-            <div className="bg-elevated/60 rounded-lg p-3 text-xs font-mono space-y-1">
-              {Object.entries(action.params).map(([key, value]) => (
-                <div key={key} className="flex gap-2">
-                  <span className="text-txt-m">{key}:</span>
-                  <span className="text-txt-2 break-all">
-                    {typeof value === "string"
-                      ? value.length > 200
-                        ? value.slice(0, 200) + "..."
-                        : value
-                      : JSON.stringify(value)}
-                  </span>
-                </div>
-              ))}
+        {action && (
+          <div className="px-5 py-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded border ${levelColor(
+                  action.level
+                )}`}
+              >
+                {action.level?.toUpperCase() || t("unknown")}
+              </span>
+              <span className="text-sm text-txt-2 font-mono">
+                {action.tool}
+              </span>
             </div>
-          )}
-        </div>
+
+            <p className="text-sm text-txt-g">{action.description}</p>
+
+            {action.params && Object.keys(action.params).length > 0 && (
+              <div className="bg-elevated/60 rounded-lg p-3 text-xs font-mono space-y-1">
+                {Object.entries(action.params).map(([key, value]) => (
+                  <div key={key} className="flex gap-2">
+                    <span className="text-txt-m">{key}:</span>
+                    <span className="text-txt-2 break-all">
+                      {typeof value === "string"
+                        ? value.length > 200
+                          ? value.slice(0, 200) + "..."
+                          : value
+                        : JSON.stringify(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 px-5 py-4 border-t border-bdr-sub">
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-bdr-div">
           <button
             onClick={onDeny}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors cursor-pointer"
           >
             <XCircle className="w-3.5 h-3.5" />
             {t("deny")}
           </button>
           <button
             onClick={onApproveAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 transition-colors cursor-pointer"
           >
             <CheckCircle className="w-3.5 h-3.5" />
             {t("approve_all")}
           </button>
           <button
             onClick={onApprove}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-accent/20 text-accent hover:bg-accent/30 transition-colors ml-auto"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-accent/20 text-accent hover:bg-accent/30 transition-colors ml-auto cursor-pointer"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             {t("approve")}

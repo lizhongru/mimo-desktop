@@ -1,9 +1,11 @@
-package desktop
+﻿package desktop
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -124,14 +126,60 @@ func (a *App) CompressContext() (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	runtime.EventsEmit(a.ctx, EventCompressDone, map[string]interface{}{
+		"before": before,
+		"after":  after,
+	})
 	return map[string]int{"before": before, "after": after}, nil
 }
 
-// toJSON is a helper to marshal any value to a JSON string for event payloads.
-func toJSON(v interface{}) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return "{}"
+// ExportMessage is a frontend-friendly message for export.
+type ExportMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// ExportChat exports chat messages to a Markdown file via save dialog.
+func (a *App) ExportChat(messages []ExportMessage) error {
+	if len(messages) == 0 {
+		return fmt.Errorf("no messages to export")
 	}
-	return string(b)
+
+	var sb strings.Builder
+	sb.WriteString("# MiMo Chat Export\n\n")
+	sb.WriteString(fmt.Sprintf("_Exported: %s_\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	sb.WriteString("---\n\n")
+
+	for _, msg := range messages {
+		role := "\U0001F916 Assistant"
+		if msg.Role == "user" {
+			role = "\U0001F464 User"
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n\n%s\n\n", role, msg.Content))
+	}
+
+	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export Chat",
+		DefaultFilename: fmt.Sprintf("chat_%s.md", time.Now().Format("20060102_150405")),
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Markdown", Pattern: "*.md"},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if filePath == "" {
+		return fmt.Errorf("export cancelled")
+	}
+	if !strings.HasSuffix(filePath, ".md") {
+		filePath += ".md"
+	}
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+	if err := os.WriteFile(filePath, []byte(sb.String()), 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	return nil
 }

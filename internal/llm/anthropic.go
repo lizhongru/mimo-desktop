@@ -1,4 +1,4 @@
-package llm
+﻿package llm
 
 import (
 	"bufio"
@@ -50,6 +50,19 @@ func (p *AnthropicProvider) IsAvailable() error {
 		return fmt.Errorf("API key is not configured")
 	}
 	return nil
+}
+
+// ListModels returns a static list of known Anthropic models
+func (p *AnthropicProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
+	// Anthropic does not have a public models API, return known models
+	return []ModelInfo{
+		{ID: "claude-3-opus-20240229", OwnedBy: "anthropic"},
+		{ID: "claude-3-sonnet-20240229", OwnedBy: "anthropic"},
+		{ID: "claude-3-haiku-20240307", OwnedBy: "anthropic"},
+		{ID: "claude-2.1", OwnedBy: "anthropic"},
+		{ID: "claude-2.0", OwnedBy: "anthropic"},
+		{ID: "claude-instant-1.2", OwnedBy: "anthropic"},
+	}, nil
 }
 
 func (p *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {

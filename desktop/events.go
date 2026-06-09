@@ -10,6 +10,7 @@ const (
 	EventError      = "agent:error"
 	EventUsage      = "agent:usage"
 	EventCompressing = "agent:compressing"
+	EventCompressDone = "agent:compress_done"
 
 	// Agent planning events
 	EventPlanning       = "agent:planning"

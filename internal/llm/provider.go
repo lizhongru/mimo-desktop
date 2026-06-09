@@ -1,4 +1,4 @@
-package llm
+﻿package llm
 
 import (
 	"context"
@@ -17,4 +17,7 @@ type Provider interface {
 
 	// IsAvailable checks if the provider is properly configured
 	IsAvailable() error
+
+	// ListModels fetches available models from the provider API
+	ListModels(ctx context.Context) ([]ModelInfo, error)
 }

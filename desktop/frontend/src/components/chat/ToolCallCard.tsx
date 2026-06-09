@@ -1,7 +1,8 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import type { ToolCallEvent } from "../../lib/types";
 import { t } from "../../lib/i18n";
+import { useSettingsStore } from "../../stores/settingsStore";
 
 interface Props {
   toolCall: ToolCallEvent;
@@ -32,6 +33,7 @@ function truncateResult(result: string, maxLines = 3, maxChars = 200): string {
 }
 
 export function ToolCallCard({ toolCall }: Props) {
+  useSettingsStore((s) => s.language);
   const [expanded, setExpanded] = useState(false);
   const args = parseArgs(toolCall.args);
   const isRunning = toolCall.status === "running";

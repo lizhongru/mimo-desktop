@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import {
   X,
   Settings as SettingsIcon,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { t, td } from "../../lib/i18n";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { ModelManager, type ModelConfig } from "./ModelManager";
 
 type Tab = "general" | "tools" | "models" | "help";
 
@@ -62,19 +63,12 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
   const [servers, setServers] = useState<MCPServerInfo[]>([]);
   const [toolSearch, setToolSearch] = useState("");
   const [toolTab, setToolTab] = useState<"builtin" | "mcp">("builtin");
+  const [appVersion, setAppVersion] = useState("dev");
 
   // Models state
-  const [models, setModels] = useState<Record<string, ModelDTO>>({});
+  const [models, setModels] = useState<Record<string, ModelConfig>>({});
   const [currentModel, setCurrentModel] = useState(defaultModel);
-  const [showAddModel, setShowAddModel] = useState(false);
-  const [newModel, setNewModel] = useState({
-    name: "",
-    apiBase: "",
-    apiKey: "",
-    model: "",
-    maxTokens: 32768,
-    temperature: 0.3,
-  });
+
 
   useEffect(() => {
     if (!open) return;
@@ -88,9 +82,12 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
         setCurrentModel(cfg.defaultModel);
       })
       .catch(console.error);
+    window.go?.desktop?.App?.GetVersion?.()
+      .then((v) => setAppVersion(v.version || "dev"))
+      .catch(console.error);
   }, [open]);
 
-  if (!open) return null;
+
 
   const builtinTools = tools.filter((t) => !t.isMcp);
   const mcpTools = tools.filter((t) => t.isMcp);
@@ -105,38 +102,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
       t.description.toLowerCase().includes(toolSearch.toLowerCase())
   );
 
-  const handleAddModel = () => {
-    if (!newModel.name || !newModel.apiBase) return;
-    window.go?.desktop?.App?.AddModel?.(
-      newModel.name,
-      newModel.apiBase,
-      newModel.apiKey,
-      newModel.model,
-      newModel.maxTokens,
-      newModel.temperature
-    )
-      .then(() => {
-        setModels((prev) => ({
-          ...prev,
-          [newModel.name]: {
-            apiBase: newModel.apiBase,
-            model: newModel.model,
-            maxTokens: newModel.maxTokens,
-            temperature: newModel.temperature,
-          },
-        }));
-        setShowAddModel(false);
-        setNewModel({
-          name: "",
-          apiBase: "",
-          apiKey: "",
-          model: "",
-          maxTokens: 32768,
-          temperature: 0.3,
-        });
-      })
-      .catch(console.error);
-  };
+
 
   const handleSetDefault = (name: string) => {
     window.go?.desktop?.App?.SetDefaultModel?.(name)
@@ -185,10 +151,10 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-surface border border-bdr rounded-xl w-[780px] h-[600px] mx-4 shadow-2xl flex flex-col overflow-hidden">
+    <div className={`modal-overlay ${open ? "is-open" : ""}`} onClick={onClose}>
+      <div className="modal-dialog !p-0 w-[780px] h-[600px] mx-4 flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-bdr-sub flex-shrink-0">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-bdr-div flex-shrink-0">
           <SettingsIcon className="w-5 h-5 text-accent" />
           <h2 className="text-base font-medium text-txt">
             {t("settings")}
@@ -237,7 +203,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                     {(["dark", "light"] as const).map((th) => (
                       <button
                         key={th}
-                        onClick={() => setTheme(th)}
+                        onClick={(e) => setTheme(th, e.clientX, e.clientY)}
                         className={`px-4 py-2 rounded-md text-sm transition-colors cursor-pointer ${
                           theme === th
                             ? "bg-accent/20 text-accent border border-accent/30"
@@ -319,7 +285,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                     </span>
                   </div>
                   <div className="text-xs text-txt-g space-y-1">
-                    <p>MiMo Desktop v0.1.0</p>
+                    <p>MiMo Desktop v{appVersion}</p>
                     <p>{t("app_description")}</p>
                   </div>
                 </div>
@@ -419,185 +385,34 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
               </div>
             )}
 
-            {/* Models */}
+                        {/* Models */}
             {tab === "models" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-txt-2">
-                    {t("current_model")}:{" "}
-                    <span className="text-accent font-mono">{currentModel}</span>
-                  </span>
-                  <button
-                    onClick={() => setShowAddModel(!showAddModel)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-accent/15 text-accent hover:bg-accent/25 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    {t("add_model")}
-                  </button>
-                </div>
-
-                {/* Add model form */}
-                {showAddModel && (
-                  <div className="border border-bdr rounded-lg p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-txt-g mb-1 block">
-                          {t("model_name")} *
-                        </label>
-                        <input
-                          value={newModel.name}
-                          onChange={(e) =>
-                            setNewModel({ ...newModel, name: e.target.value })
-                          }
-                          placeholder="my-model"
-                          className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-txt-g mb-1 block">
-                          {t("model_id")}
-                        </label>
-                        <input
-                          value={newModel.model}
-                          onChange={(e) =>
-                            setNewModel({ ...newModel, model: e.target.value })
-                          }
-                          placeholder="gpt-4o"
-                          className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-txt-g mb-1 block">
-                        {t("api_base")} *
-                      </label>
-                      <input
-                        value={newModel.apiBase}
-                        onChange={(e) =>
-                          setNewModel({ ...newModel, apiBase: e.target.value })
-                        }
-                        placeholder="https://api.openai.com/v1"
-                        className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-txt-g mb-1 block">
-                        {t("api_key")}
-                      </label>
-                      <input
-                        type="password"
-                        value={newModel.apiKey}
-                        onChange={(e) =>
-                          setNewModel({ ...newModel, apiKey: e.target.value })
-                        }
-                        placeholder="sk-..."
-                        className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-txt-g mb-1 block">
-                          {t("max_tokens")}
-                        </label>
-                        <input
-                          type="number"
-                          value={newModel.maxTokens}
-                          onChange={(e) =>
-                            setNewModel({
-                              ...newModel,
-                              maxTokens: Number(e.target.value),
-                            })
-                          }
-                          className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-txt-g mb-1 block">
-                          {t("temperature")}
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="2"
-                          value={newModel.temperature}
-                          onChange={(e) =>
-                            setNewModel({
-                              ...newModel,
-                              temperature: Number(e.target.value),
-                            })
-                          }
-                          className="w-full bg-elevated border border-bdr rounded-md px-3 py-1.5 text-sm text-txt focus:outline-none focus:border-accent/50"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => setShowAddModel(false)}
-                        className="px-3 py-1.5 rounded-md text-sm bg-elevated text-txt-2 hover:bg-elevated/80 cursor-pointer"
-                      >
-                        {t("cancel")}
-                      </button>
-                      <button
-                        onClick={handleAddModel}
-                        className="px-3 py-1.5 rounded-md text-sm bg-accent/20 text-accent hover:bg-accent/30 cursor-pointer"
-                      >
-                        {t("save")}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Model list */}
-                <div className="space-y-2">
-                  {Object.entries(models).map(([name, cfg]) => (
-                    <div
-                      key={name}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
-                        currentModel === name
-                          ? "border-accent/30 bg-accent/5"
-                          : "border-bdr-sub bg-elevated/30"
-                      }`}
-                    >
-                      <Cpu className="w-4 h-4 text-txt-g flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm text-txt-2">
-                            {name}
-                          </span>
-                          {currentModel === name && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent">
-                              {t("default_badge")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-txt-m truncate">
-                          {cfg.model} / {cfg.apiBase}
-                        </div>
-                      </div>
-                      {currentModel !== name && (
-                        <button
-                          onClick={() => handleSetDefault(name)}
-                          className="text-xs text-txt-g hover:text-accent transition-colors cursor-pointer px-2 py-1 rounded hover:bg-elevated"
-                        >
-                          {t("set_default")}
-                        </button>
-                      )}
-                      {currentModel !== name && name !== "mimo" && (
-                        <button
-                          onClick={() => handleRemoveModel(name)}
-                          className="p-1 text-txt-m hover:text-red-400 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ModelManager
+                models={models}
+                currentModel={currentModel}
+                onSetDefault={handleSetDefault}
+                onRemove={handleRemoveModel}
+                onAdd={(name, cfg) => {
+                  window.go?.desktop?.App?.AddModel?.(
+                    name, cfg.provider, cfg.website, cfg.apiBase, cfg.apiKey,
+                    cfg.model, cfg.models, cfg.fallback, cfg.maxTokens,
+                    cfg.temperature, cfg.topP, cfg.streaming, cfg.vision, cfg.tools
+                  ).then(() => {
+                    setModels((prev) => ({ ...prev, [name]: cfg }));
+                  }).catch(console.error);
+                }}
+                onUpdate={(name, cfg) => {
+                  window.go?.desktop?.App?.UpdateModel?.(
+                    name, cfg.provider, cfg.website, cfg.apiBase, cfg.apiKey,
+                    cfg.model, cfg.models, cfg.fallback, cfg.maxTokens,
+                    cfg.temperature, cfg.topP, cfg.streaming, cfg.vision, cfg.tools
+                  ).then(() => {
+                    setModels((prev) => ({ ...prev, [name]: cfg }));
+                  }).catch(console.error);
+                }}
+              />
             )}
-
-            {/* Help & Feedback */}
+{/* Help & Feedback */}
             {tab === "help" && (
               <div className="space-y-6">
                 {/* Shortcuts */}
@@ -669,7 +484,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                     </span>
                   </div>
                   <div className="text-xs text-txt-g space-y-1">
-                    <p>MiMo Desktop v0.1.0</p>
+                    <p>MiMo Desktop v{appVersion}</p>
                     <p>
                       {t("app_description")}
                     </p>

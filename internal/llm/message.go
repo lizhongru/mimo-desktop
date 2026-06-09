@@ -1,4 +1,4 @@
-package llm
+﻿package llm
 
 // Role represents the role of a message sender
 type Role string
@@ -64,7 +64,8 @@ type ChatRequest struct {
 	MaxTokens   int              `json:"max_tokens,omitempty"`
 	Temperature *float64         `json:"temperature,omitempty"`
 	TopP        *float64         `json:"top_p,omitempty"`
-	Stream      bool             `json:"stream"`
+	Stream          bool           `json:"stream"`
+	ReasoningEffort string         `json:"reasoning_effort,omitempty"` // low, medium, high
 }
 
 // Usage represents token usage statistics
@@ -81,4 +82,23 @@ type ChatResponse struct {
 	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
 	FinishReason string     `json:"finish_reason"`
 	Usage        Usage      `json:"usage"`
+}
+
+// ModelInfo represents information about an available model
+type ModelInfo struct {
+	ID           string   `json:"id"`
+	OwnedBy      string   `json:"owned_by,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	ContextWindow int     `json:"context_window,omitempty"`
+	MaxOutput    int      `json:"max_output,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
+}
+
+// ModelCapabilities represents the capabilities of a model
+type ModelCapabilities struct {
+	ContextWindow int    `json:"context_window"` // Max context tokens
+	MaxOutput     int    `json:"max_output"`     // Max output tokens
+	SupportsVision bool  `json:"supports_vision"`
+	SupportsTools  bool  `json:"supports_tools"`
+	SupportsStreaming bool `json:"supports_streaming"`
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import {
   Wrench,
   X,
@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   Server,
 } from "lucide-react";
-import { t } from "../../lib/i18n";
+import { t, td } from "../../lib/i18n";
+import { useSettingsStore } from "../../stores/settingsStore";
 
 interface ToolInfo {
   name: string;
@@ -44,6 +45,13 @@ function SafetyBadge({ level }: { level: string }) {
       ? Shield
       : ShieldCheck;
 
+  const levelLabels: Record<string, string> = {
+    LOW: t("safety_low"),
+    MEDIUM: t("safety_medium"),
+    HIGH: t("safety_high"),
+    CRITICAL: t("safety_critical"),
+  };
+
   return (
     <span
       className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${
@@ -51,7 +59,7 @@ function SafetyBadge({ level }: { level: string }) {
       }`}
     >
       <Icon className="w-2.5 h-2.5" />
-      {level}
+      {levelLabels[level] || level}
     </span>
   );
 }
@@ -61,6 +69,7 @@ export function ToolsViewer({ open, onClose }: Props) {
   const [servers, setServers] = useState<MCPServerInfo[]>([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"tools" | "mcp">("tools");
+  useSettingsStore((s) => s.language);
 
   useEffect(() => {
     if (!open) return;
@@ -68,7 +77,7 @@ export function ToolsViewer({ open, onClose }: Props) {
     window.go?.desktop?.App?.GetMCPServers?.().then(setServers).catch(console.error);
   }, [open]);
 
-  if (!open) return null;
+
 
   const filtered = tools.filter(
     (tool) =>
@@ -80,10 +89,10 @@ export function ToolsViewer({ open, onClose }: Props) {
   const mcpTools = filtered.filter((tool) => tool.isMcp);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-surface border border-bdr rounded-xl w-[700px] max-h-[80vh] mx-4 shadow-2xl flex flex-col">
+    <div className={`modal-overlay ${open ? "is-open" : ""}`} onClick={onClose}>
+      <div className="modal-dialog !p-0 w-[700px] max-h-[80vh] mx-4 flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-bdr-sub">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-bdr-div">
           <Wrench className="w-5 h-5 text-accent" />
           <h2 className="text-base font-medium text-txt">
             {t("tools_mcp")}
@@ -103,7 +112,7 @@ export function ToolsViewer({ open, onClose }: Props) {
         <div className="flex items-center gap-1 px-5 pt-2">
           <button
             onClick={() => setTab("tools")}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors cursor-pointer ${
+            className={`px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
               tab === "tools"
                 ? "bg-elevated text-txt"
                 : "text-txt-g hover:text-txt-2"
@@ -114,7 +123,7 @@ export function ToolsViewer({ open, onClose }: Props) {
           </button>
           <button
             onClick={() => setTab("mcp")}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors cursor-pointer ${
+            className={`px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
               tab === "mcp"
                 ? "bg-elevated text-txt"
                 : "text-txt-g hover:text-txt-2"
@@ -154,7 +163,7 @@ export function ToolsViewer({ open, onClose }: Props) {
                     <SafetyBadge level={tool.safetyLevel} />
                   </div>
                   <p className="text-xs text-txt-g line-clamp-2">
-                    {tool.description}
+                    {td(tool.name)}
                   </p>
                 </div>
               ))}
@@ -217,7 +226,7 @@ export function ToolsViewer({ open, onClose }: Props) {
                         <SafetyBadge level={tool.safetyLevel} />
                       </div>
                       <p className="text-xs text-txt-g line-clamp-2">
-                        {tool.description}
+                        {td(tool.name)}
                       </p>
                     </div>
                   ))}
