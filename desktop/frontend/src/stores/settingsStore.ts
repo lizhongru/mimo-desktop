@@ -21,6 +21,7 @@ interface SettingsState {
   setSafetyLevel: (level: string) => void;
   setPermission: (perm: string) => void;
   setReasoningLevel: (level: string) => void;
+  refreshModels: () => void;
   initFromConfig: (cfg: {
     theme?: string;
     language?: string;
@@ -86,6 +87,21 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setReasoningLevel: (level) => {
     set({ reasoningLevel: level });
     window.go?.desktop?.App?.SetReasoningLevel?.(level).catch(console.error);
+  },
+
+  refreshModels: () => {
+    window.go?.desktop?.App?.GetConfig?.().then((cfg) => {
+      const modelsMap = (cfg.models || {}) as Record<string, { model?: string }>;
+      const modelKey = cfg.defaultModel || useSettingsStore.getState().currentModelKey;
+      let displayModel = modelKey;
+      if (modelKey && modelsMap[modelKey]?.model) displayModel = modelsMap[modelKey].model!;
+      set({
+        models: cfg.models ? Object.keys(cfg.models) : [],
+        _modelsMap: modelsMap,
+        currentModel: displayModel,
+        currentModelKey: modelKey,
+      } as any);
+    }).catch(console.error);
   },
 
   initFromConfig: (cfg) => {

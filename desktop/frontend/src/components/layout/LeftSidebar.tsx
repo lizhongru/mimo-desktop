@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import {
   Plus,
   MessageSquare,
@@ -22,7 +22,7 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
-import { useSessionStore, type SessionItem } from "../../stores/sessionStore";
+import { useSessionStore, type SessionItem, type WorkspaceItem } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { t } from "../../lib/i18n";
 import { ShortcutsPanel } from "../common/ShortcutsPanel";
@@ -171,7 +171,14 @@ function SessionItemRow({
           ? "bg-accent/10 border-l-2 border-accent"
           : "border-l-2 border-transparent hover:bg-elevated/40"
       } ${isSelected ? "bg-accent/10" : ""}`}
-      onClick={() => (isManageMode ? onToggleSelect(session.id) : onLoad(session.id))}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (isManageMode) {
+          onToggleSelect(session.id);
+        } else {
+          onLoad(session.id);
+        }
+      }}
       onContextMenu={(e) => onContextMenu(e, session.id)}
     >
       {isManageMode ? (
@@ -217,9 +224,9 @@ export function LeftSidebar({
   const sessions = useSessionStore((s) => s.sessions);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [workingDir, setWorkingDir] = useState("");
-  const [currentExpanded, setCurrentExpanded] = useState(true);
-  const [otherExpanded, setOtherExpanded] = useState(false);
+  const workspaces = useSessionStore((s) => s.workspaces);
+  const [defaultExpanded, setDefaultExpanded] = useState(true);
+  const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<Set<string>>(new Set());
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pinnedDirs, setPinnedDirs] = useState<Set<string>>(new Set());
@@ -237,10 +244,10 @@ export function LeftSidebar({
   const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
-    // ListSessions is called once in App.tsx; avoid duplicate calls here.
-    window.go?.desktop?.App?.GetWorkingDir?.()
-      .then(setWorkingDir)
-      .catch(console.error);
+  // Workspaces are loaded in App.tsx on mount
+
+
+
   }, []);
 
   // Close context menu on escape
@@ -278,7 +285,7 @@ export function LeftSidebar({
       x: e.clientX,
       y: e.clientY,
       sessionId,
-      workspaceDir: session?.workingDir || workingDir,
+      workspaceDir: session?.workspaceId || "",
     });
   };
 
@@ -308,7 +315,7 @@ export function LeftSidebar({
   };
 
   const deleteWorkspace = (dir: string) => {
-    const dirSessions = sessions.filter((s) => (s.workingDir || workingDir) === dir);
+    const dirSessions = sessions.filter((s) => s.workspaceId === dir);
     for (const s of dirSessions) onDeleteSession(s.id);
   };
 
@@ -324,26 +331,47 @@ export function LeftSidebar({
     setRenameValue("");
   };
 
-  // Group sessions by working directory
-  const currentSessions: SessionItem[] = [];
-  const otherGroups = new Map<string, SessionItem[]>();
+  // Group sessions by workspace
+  const workspaceGroups = new Map<string, SessionItem[]>();
 
   for (const session of sessions) {
-    if (!session.workingDir || session.workingDir === workingDir) {
-      currentSessions.push(session);
-    } else {
-      const dir = session.workingDir;
-      if (!otherGroups.has(dir)) otherGroups.set(dir, []);
-      otherGroups.get(dir)!.push(session);
-    }
+    const wsId = session.workspaceId || "default";
+    if (!workspaceGroups.has(wsId)) workspaceGroups.set(wsId, []);
+    workspaceGroups.get(wsId)!.push(session);
   }
 
-  // Sort: pinned dirs first
-  const sortedOtherGroups = Array.from(otherGroups.entries()).sort(([a], [b]) => {
+  // Build display list: folder workspaces first, then the default conversation group.
+  const defaultSessions = workspaceGroups.get("default") || [];
+  workspaceGroups.delete("default");
+  const otherEntries = Array.from(workspaceGroups.entries()).sort(([a], [b]) => {
     const aPinned = pinnedDirs.has(a) ? 0 : 1;
     const bPinned = pinnedDirs.has(b) ? 0 : 1;
     return aPinned - bPinned;
   });
+
+  const getWorkspaceName = (wsId: string): string => {
+    if (wsId === "default") return t("conversations");
+    const ws = workspaces.find((w) => w.id === wsId);
+    if (ws) return ws.name;
+    // Fallback: extract from wsId (e.g. "ws:D:\path" -> "path")
+    if (wsId.startsWith("ws:")) {
+      const parts = wsId.slice(3).replace(/\\/g, "/").split("/").filter(Boolean);
+      return parts[parts.length - 1] || wsId;
+    }
+    return wsId;
+  };
+
+  const toggleWorkspaceExpanded = (wsId: string) => {
+    setExpandedWorkspaceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(wsId)) {
+        next.delete(wsId);
+      } else {
+        next.add(wsId);
+      }
+      return next;
+    });
+  };
 
   const renderSessionRow = (session: SessionItem) => (
     <SessionItemRow
@@ -359,22 +387,23 @@ export function LeftSidebar({
     />
   );
 
-  const renderWorkspaceGroup = (dir: string, dirSessions: SessionItem[], isCurrent: boolean) => {
-    const isPinned = pinnedDirs.has(dir);
+  const renderWorkspaceGroup = (wsId: string, dirSessions: SessionItem[], expanded: boolean, onToggle: () => void) => {
+    const isPinned = pinnedDirs.has(wsId);
     const wsManage = manageMode && selectedIds.size > 0;
+    const GroupIcon = wsId === "default" ? MessageSquare : FolderOpen;
 
     return (
-      <div key={dir} className="mb-1">
+      <div key={wsId} className="mb-1">
         <button
-          onClick={() => isCurrent ? setCurrentExpanded(!currentExpanded) : null}
-          onContextMenu={(e) => handleWorkspaceContextMenu(e, dir)}
+          onClick={onToggle}
+          onContextMenu={(e) => handleWorkspaceContextMenu(e, wsId)}
           className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider w-full transition-colors cursor-pointer ${
             isPinned ? "text-accent" : "text-txt-m hover:text-txt-g"
           }`}
         >
-          <ChevronDown className={`w-3 h-3 transition-transform ${isCurrent ? (currentExpanded ? "" : "-rotate-90") : (otherExpanded ? "" : "-rotate-90")}`} />
-          <FolderOpen className="w-3 h-3" />
-          <span className="truncate">{getDirName(dir)}</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+          <GroupIcon className="w-3 h-3" />
+          <span className="truncate">{getWorkspaceName(wsId)}</span>
           {isPinned && <Pin className="w-2.5 h-2.5 ml-0.5" />}
           {manageMode && (
             <button
@@ -402,13 +431,13 @@ export function LeftSidebar({
             <span className="ml-auto text-txt-g">{dirSessions.length}</span>
           )}
         </button>
-        {(isCurrent ? currentExpanded : otherExpanded) && dirSessions.map(renderSessionRow)}
+        {expanded && dirSessions.map(renderSessionRow)}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-full w-[260px]">
+    <div className="flex flex-col h-full w-[260px] relative" style={{ zIndex: 50 }}>
       {/* Header */}
       <div className="p-3 border-b border-bdr-sub space-y-2">
         <div className="flex items-center gap-2">
@@ -461,16 +490,16 @@ export function LeftSidebar({
           </div>
         )}
 
-        {currentSessions.length > 0 &&
-          renderWorkspaceGroup(workingDir, currentSessions, true)}
-
-        {sortedOtherGroups.map(([dir, dirSessions]) =>
-          renderWorkspaceGroup(dir, dirSessions, false)
+        {otherEntries.map(([wsId, dirSessions]) =>
+          renderWorkspaceGroup(wsId, dirSessions, expandedWorkspaceIds.has(wsId), () => toggleWorkspaceExpanded(wsId))
         )}
+
+        {defaultSessions.length > 0 &&
+          renderWorkspaceGroup("default", defaultSessions, defaultExpanded, () => setDefaultExpanded(!defaultExpanded))}
       </div>
 
       {/* Footer ? User profile menu */}
-      <UserProfileFooter onOpenSettings={onOpenSettings} workingDir={workingDir} />
+      <UserProfileFooter onOpenSettings={onOpenSettings} />
 
       {/* Context Menu */}
       {contextMenu && (
@@ -482,7 +511,7 @@ export function LeftSidebar({
             if (contextMenu.workspaceDir) togglePin(contextMenu.workspaceDir);
           }}
           onOpenExplorer={() => {
-            const dir = contextMenu.workspaceDir || workingDir;
+            const dir = contextMenu.workspaceDir || "";
             window.go?.desktop?.App?.OpenInExplorer?.(dir).catch(console.error);
           }}
           onRename={() => {
@@ -563,15 +592,12 @@ export function LeftSidebar({
       )}
     </div>
   );
-}
 
 
 function UserProfileFooter({
   onOpenSettings,
-  workingDir,
 }: {
   onOpenSettings: () => void;
-  workingDir: string;
 }) {
   const language = useSettingsStore((s) => s.language);
   const theme = useSettingsStore((s) => s.theme);
@@ -618,15 +644,11 @@ function UserProfileFooter({
         className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md hover:bg-elevated transition-colors cursor-pointer"
       >
         <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-xs font-bold text-accent">
-            {(workingDir || "U").charAt(0).toUpperCase()}
-          </span>
+          <span className="text-xs font-bold text-accent">M</span>
         </div>
         <div className="flex-1 min-w-0 text-left">
-          <div className="text-xs font-medium text-txt truncate">
-            {getDirName(workingDir) || "MiMo Desktop"}
-          </div>
-          <div className="text-[10px] text-txt-g truncate">{workingDir || "No workspace"}</div>
+          <div className="text-xs font-medium text-txt truncate">MiMo User</div>
+          <div className="text-[10px] text-txt-g truncate">{t("click_to_settings")}</div>
         </div>
         <ChevronDown
           className={`w-3.5 h-3.5 text-txt-g transition-transform ${rawMenuOpen ? "rotate-180" : ""}`}
@@ -755,4 +777,5 @@ function UserProfileFooter({
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
+}
 }

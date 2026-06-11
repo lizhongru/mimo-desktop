@@ -19,8 +19,8 @@ type SearchTool struct {
 
 func NewSearchTool(ign *ignore.Matcher) *SearchTool { return &SearchTool{ign: ign} }
 
-func (t *SearchTool) Name() string        { return "search" }
-func (t *SearchTool) Description() string  { return "Search for a text pattern in files" }
+func (t *SearchTool) Name() string                { return "search" }
+func (t *SearchTool) Description() string         { return "Search for a text pattern in files" }
 func (t *SearchTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 
 func (t *SearchTool) Parameters() map[string]interface{} {
@@ -66,10 +66,7 @@ func (t *SearchTool) Execute(ctx context.Context, params map[string]interface{})
 	if v, err := StringParam(params, "path"); err == nil && v != "" {
 		dir = v
 	}
-	if !filepath.IsAbs(dir) {
-		wd, _ := os.Getwd()
-		dir = filepath.Join(wd, dir)
-	}
+	dir = ResolvePath(ctx, dir)
 
 	include := ""
 	if v, err := StringParam(params, "include"); err == nil {

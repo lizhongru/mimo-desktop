@@ -7,12 +7,8 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useActivityStore } from "./stores/activityStore";
 import { t } from "./lib/i18n";
 
-const DEFAULT_WS = "default";
-
-function workspaceIdFromDir(dir: string): string {
-  return dir ? `ws:${dir}` : DEFAULT_WS;
-}
-
+// Wails Go bindings — auto-generated at build time
+// Package name "desktop" matches the Go package name in desktop/
 declare global {
   interface Window {
     go: {
@@ -27,22 +23,66 @@ declare global {
           GetVersion: () => Promise<Record<string, string>>;
           CompressContext: () => Promise<{ before: number; after: number }>;
           ExportChat: (messages: Array<{ role: string; content: string }>) => Promise<void>;
+          // Project info
           GetWorkingDir: () => Promise<string>;
-          GetTools: () => Promise<Array<{ name: string; description: string; safetyLevel: string; isMcp: boolean; serverName: string }>>;
-          GetMCPServers: () => Promise<Array<{ name: string; connected: boolean; toolCount: number; tools: string[] }>>;
-          // Workspace methods
-          ListWorkspaces: () => Promise<Array<{ id: string; name: string; type: string; path: string }>>;
-          CreateWorkspace: (path: string) => Promise<{ id: string; name: string; type: string; path: string }>;
+          // Tools
+          GetTools: () => Promise<Array<{
+            name: string;
+            description: string;
+            safetyLevel: string;
+            isMcp: boolean;
+            serverName: string;
+          }>>;
+          GetMCPServers: () => Promise<Array<{
+            name: string;
+            connected: boolean;
+            toolCount: number;
+            tools: string[];
+          }>>;
           // Session methods
-          ListSessions: (limit: number) => Promise<Array<{ id: string; workspaceId: string; modelName: string; userName: string; lastMessage: string; createdAt: string; updatedAt: string }>>;
-          CreateNewSession: (workspaceId: string) => Promise<string>;
-          LoadSession: (id: string) => Promise<{ id: string; workspaceId: string; modelName: string; messages: Array<{ role: string; content: string; thinking?: string; toolLines?: string[]; tokens: number; toolCalls: number; durationMs: number }> }>;
+          ListSessions: (limit: number) => Promise<Array<{
+            id: string;
+            modelName: string;
+            userName: string;
+            lastMessage: string;
+            workingDir: string;
+            createdAt: string;
+            updatedAt: string;
+          }>>;
+          CreateNewSession: (workingDir: string) => Promise<string>;
+          LoadSession: (id: string) => Promise<{
+            id: string;
+            modelName: string;
+            workingDir: string;
+            messages: Array<{
+              role: string;
+              content: string;
+              thinking?: string;
+              toolLines?: string[];
+              tokens: number;
+              toolCalls: number;
+              durationMs: number;
+            }>;
+          }>;
           DeleteSession: (id: string) => Promise<void>;
-          RenameSession: (id: string, title: string) => Promise<void>;
-          MoveSession: (sessionId: string, workspaceId: string) => Promise<void>;
+          RenameSession: (id: string, title: string) => Promise<void>
+          SetSessionWorkspace: (sessionId: string, workingDir: string) => Promise<void>;
           SaveSessionFromFrontend: (sessionId: string, messages: unknown[]) => Promise<void>;
           // Config methods
-          GetConfig: () => Promise<{ defaultModel: string; language: string; theme: string; userName: string; models: Record<string, { provider: string; website: string; apiBase: string; apiKey: string; model: string; models: string[]; fallback: string; maxTokens: number; temperature: number; topP: number; streaming: boolean; vision: boolean; tools: boolean }>; safety: { level: string; permission: string }; agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean } }>;
+          GetConfig: () => Promise<{
+            defaultModel: string;
+            language: string;
+            theme: string;
+            userName: string;
+            models: Record<string, {
+              provider: string; website: string; apiBase: string; apiKey: string;
+              model: string; models: string[]; fallback: string;
+              maxTokens: number; temperature: number; topP: number;
+              streaming: boolean; vision: boolean; tools: boolean;
+            }>;
+            safety: { level: string; permission: string };
+            agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean };
+          }>;
           SetTheme: (theme: string) => Promise<void>;
           SetLanguage: (lang: string) => Promise<void>;
           SetDefaultModel: (name: string) => Promise<void>;
@@ -53,14 +93,18 @@ declare global {
           SetPlanningMode: (mode: string) => Promise<void>;
           SetPermission: (perm: string) => Promise<void>;
           SetReasoningLevel: (level: string) => Promise<void>;
+          // Window controls
           WindowMinimise: () => Promise<void>;
           WindowMaximise: () => Promise<void>;
           WindowClose: () => Promise<void>;
           WindowIsMaximised: () => Promise<boolean>;
+          // Explorer
           OpenInExplorer: (path: string) => Promise<void>;
+          // Directory picker
           SelectDirectory: () => Promise<string>;
-          ListRemoteModels: (modelName: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
-          ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
+          // Remote model listing
+          ListRemoteModels: (modelName: string) => Promise<Array<{id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[]}>>;
+          ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[]}>>;
         };
       };
     };
@@ -71,34 +115,34 @@ export default function App() {
   const currentModel = useSettingsStore((s) => s.currentModel);
   useAgent();
 
-  // Load sessions, workspaces and config on mount
   useEffect(() => {
-    Promise.all([
-      window.go?.desktop?.App?.ListSessions?.(30),
-      window.go?.desktop?.App?.ListWorkspaces?.(),
-    ]).then(([sessions, workspaces]) => {
-      useSessionStore.getState().setSessions(sessions || []);
-      useSessionStore.getState().setWorkspaces(workspaces || []);
+    // Load sessions on mount
+    window.go?.desktop?.App?.ListSessions?.(30).then((list) => {
+      useSessionStore.getState().setSessions(list || []);
     }).catch(console.error);
-
+    // Do NOT create a session on mount — lazy-create on first send
+    // This avoids accumulating empty sessions in the DB
+    // Initialize settings from config
     window.go?.desktop?.App?.GetConfig?.().then((cfg) => {
       useSettingsStore.getState().initFromConfig({
-        theme: cfg.theme, language: cfg.language, defaultModel: cfg.defaultModel,
-        models: cfg.models, planningMode: cfg.agent?.planningMode,
-        safetyLevel: cfg.safety?.level, permission: cfg.agent?.permission,
+        theme: cfg.theme,
+        language: cfg.language,
+        defaultModel: cfg.defaultModel,
+        models: cfg.models,
+        planningMode: cfg.agent?.planningMode,
+        safetyLevel: cfg.safety?.level,
+        permission: cfg.agent?.permission,
         reasoningLevel: cfg.agent?.reasoningLevel,
       });
     }).catch(console.error);
   }, []);
-
-  // Send a message — lazy-creates session if needed
   const handleSend = useCallback(async (message: string, attachments?: { name: string; type: string; dataUrl: string }[]) => {
     const sessStore = useSessionStore.getState();
     let sid = sessStore.currentSessionId;
-    const ws = sessStore.selectedWorkspace || DEFAULT_WS;
 
+    // Lazy-create session if needed
     if (!sid) {
-      console.log("[handleSend] selectedWorkspace:", sessStore.selectedWorkspace, "=> ws:", ws);
+      const ws = sessStore.selectedWorkspace || "";
       try {
         sid = await window.go?.desktop?.App?.CreateNewSession?.(ws);
         sessStore.setCurrentSessionId(sid);
@@ -108,22 +152,18 @@ export default function App() {
       }
     }
 
-    if (sid && useChatStore.getState().messages.length === 0) {
-      await window.go?.desktop?.App?.MoveSession?.(sid, ws);
-    }
-
+    // If current session is not in the sidebar list, add it with workingDir from store
     if (!sessStore.sessions.find((s) => s.id === sid)) {
       sessStore.addSession({
         id: sid!,
-        workspaceId: ws,
         modelName: "",
         userName: "",
         lastMessage: message,
+        workingDir: sessStore.selectedWorkspace || "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
     }
-
     sessStore.setStreamingSessionId(sid);
     useChatStore.getState().addUserMessage(message);
     const attachmentsJSON = attachments && attachments.length > 0 ? JSON.stringify(attachments) : "";
@@ -133,35 +173,37 @@ export default function App() {
       useChatStore.getState().finalizeResponse(`${t("error_prefix")}: ${err}`, 0);
     });
   }, []);
+    useChatStore.getState().addUserMessage(message);
+    const attachmentsJSON = attachments && attachments.length > 0 ? JSON.stringify(attachments) : "";
+    window.go?.desktop?.App?.SendMessage?.(message, attachmentsJSON).catch((err) => {
 
   const handleCancel = useCallback(() => {
     window.go?.desktop?.App?.CancelOperation?.().catch(console.error);
   }, []);
 
-  // New chat — create session bound to current workspace
   const handleNewChat = useCallback(() => {
-    const ws = useSessionStore.getState().selectedWorkspace || DEFAULT_WS;
+    // Create new session with current selectedWorkspace
+    const ws = useSessionStore.getState().selectedWorkspace;
     window.go?.desktop?.App?.CreateNewSession?.(ws).then((id) => {
-      useSessionStore.getState().setCurrentSessionId(id);
       useChatStore.getState().clearMessages();
       useActivityStore.getState().clear();
     }).catch(console.error);
   }, []);
 
-  // Load existing session — restore workspace from backend
   const handleLoadSession = useCallback((id: string) => {
     window.go?.desktop?.App?.LoadSession?.(id).then((data) => {
       useSessionStore.getState().setCurrentSessionId(id);
       useChatStore.getState().clearMessages();
       useActivityStore.getState().clear();
+      // Restore messages to chat store
       if (data?.messages) {
         for (const msg of data.messages) {
           useChatStore.getState().addRestoredMessage(msg as { role: "user" | "assistant"; content: string; thinking?: string; toolLines?: string[]; tokens?: number; toolCalls?: number; durationMs?: number });
         }
       }
-      // Restore workspace selection from backend
-      if (data?.workspaceId) {
-        useSessionStore.getState().setSelectedWorkspace(data.workspaceId);
+      // Restore session's workingDir from backend (authoritative source)
+      if (data?.workingDir) {
+        useSessionStore.getState().setSelectedWorkspace(data.workingDir);
       }
     }).catch(console.error);
   }, []);
@@ -177,31 +219,8 @@ export default function App() {
 
   const [toast, setToast] = useState<string | null>(null);
 
-  // Select workspace — update store; session binding happens at creation time
-  const handleSelectWorkspace = useCallback(async (dir: string) => {
-    const workspaceId = workspaceIdFromDir(dir);
-    const sessStore = useSessionStore.getState();
-    const hasMessages = useChatStore.getState().messages.length > 0;
-
-    sessStore.setSelectedWorkspace(workspaceId);
-    if (sessStore.currentSessionId && !hasMessages) {
-      await window.go?.desktop?.App?.MoveSession?.(sessStore.currentSessionId, workspaceId);
-    }
-
-    // dir is a filesystem path; convert to workspace ID
-    if (dir) {
-      try {
-        const ws = await window.go?.desktop?.App?.CreateWorkspace?.(dir);
-        useSessionStore.getState().setSelectedWorkspace(ws.id);
-        // Refresh workspaces list
-        const list = await window.go?.desktop?.App?.ListWorkspaces?.();
-        useSessionStore.getState().setWorkspaces(list || []);
-      } catch (e) {
-        console.error("CreateWorkspace failed:", e);
-      }
-    } else {
-      useSessionStore.getState().setSelectedWorkspace(DEFAULT_WS);
-    }
+  const handleSelectWorkspace = useCallback((dir: string) => {
+    useSessionStore.getState().setSelectedWorkspace(dir);
   }, []);
 
   const handleExportSession = useCallback(async (id: string) => {
@@ -229,15 +248,18 @@ export default function App() {
   const handleConfirmApprove = useCallback(() => {
     window.go?.desktop?.App?.RespondToConfirm?.(true).catch(console.error);
   }, []);
+
   const handleConfirmDeny = useCallback(() => {
     window.go?.desktop?.App?.RespondToConfirm?.(false).catch(console.error);
   }, []);
+
   const handleConfirmApproveAll = useCallback(() => {
     window.go?.desktop?.App?.RespondToConfirmAll?.(true).catch(console.error);
   }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
+    // Regenerate: re-send the last user message
     const handleRegenerate = () => {
       const msgs = useChatStore.getState().messages;
       const lastUser = [...msgs].reverse().find((m) => m.role === "user");
@@ -247,7 +269,9 @@ export default function App() {
         handleSend(lastUser.content);
       }
     };
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape: cancel or close dialog
       if (e.key === "Escape") {
         const state = useChatStore.getState();
         if (state.confirmAction) {
@@ -258,6 +282,8 @@ export default function App() {
         }
         return;
       }
+
+      // Ctrl/Cmd shortcuts
       const mod = e.ctrlKey || e.metaKey;
       if (mod) {
         switch (e.key.toLowerCase()) {

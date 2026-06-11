@@ -1,14 +1,14 @@
-﻿package desktop
+package desktop
 
 import (
 	"context"
-	"time"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
+	"time"
 
 	"github.com/mimo-cli/mimo-cli/internal/agent"
 	"github.com/mimo-cli/mimo-cli/internal/backup"
@@ -119,17 +119,7 @@ func NewApp() (*App, error) {
 	// 9. Create Agent
 	mimoAgent := agent.NewAgent(gateway, registry, guardrail, c.Context.MaxTokens, c.Agent.MaxIterations)
 
-	// Build system prompt (same as cmd/interactive.go:103-111)
-	systemPrompt := ctxManager.BuildSystemPrompt()
-	if mcpTools := mcpManager.GetTools(); len(mcpTools) > 0 {
-		systemPrompt += "\n\n## MCP Tools (Model Context Protocol)\n\n"
-		systemPrompt += "You have access to additional tools from MCP servers. Use them when appropriate:\n\n"
-		for _, t := range mcpTools {
-			systemPrompt += fmt.Sprintf("- %s: %s\n", t.Name(), t.Description())
-		}
-		systemPrompt += "\nMCP tools are prefixed with the server name (e.g., filesystem__list_directory). Use them like any other tool.\n"
-	}
-	mimoAgent.SystemPrompt(systemPrompt)
+	mimoAgent.SystemPrompt(a.buildSystemPrompt(wd))
 
 	// Set planning mode
 	switch c.Agent.PlanningMode {
@@ -157,6 +147,26 @@ func NewApp() (*App, error) {
 	}
 
 	return a, nil
+}
+
+func (a *App) buildSystemPrompt(projectDir string) string {
+	if projectDir == "" {
+		projectDir, _ = os.Getwd()
+	}
+	ctxManager := mctx.NewManager(projectDir, a.cfg.Context.MaxTokens, a.ignoreMatcher)
+	systemPrompt := ctxManager.BuildSystemPrompt()
+	if a.mcpManager == nil {
+		return systemPrompt
+	}
+	if mcpTools := a.mcpManager.GetTools(); len(mcpTools) > 0 {
+		systemPrompt += "\n\n## MCP Tools (Model Context Protocol)\n\n"
+		systemPrompt += "You have access to additional tools from MCP servers. Use them when appropriate:\n\n"
+		for _, t := range mcpTools {
+			systemPrompt += fmt.Sprintf("- %s: %s\n", t.Name(), t.Description())
+		}
+		systemPrompt += "\nMCP tools are prefixed with the server name (e.g., filesystem__list_directory). Use them like any other tool.\n"
+	}
+	return systemPrompt
 }
 
 // Startup is called when the Wails application starts.

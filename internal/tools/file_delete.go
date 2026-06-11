@@ -13,8 +13,8 @@ type FileDeleteTool struct{}
 
 func NewFileDeleteTool() *FileDeleteTool { return &FileDeleteTool{} }
 
-func (t *FileDeleteTool) Name() string        { return "file_delete" }
-func (t *FileDeleteTool) Description() string  { return "Delete a file or empty directory" }
+func (t *FileDeleteTool) Name() string                { return "file_delete" }
+func (t *FileDeleteTool) Description() string         { return "Delete a file or empty directory" }
 func (t *FileDeleteTool) GetSafetyLevel() SafetyLevel { return SafetyHigh }
 func (t *FileDeleteTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -36,6 +36,7 @@ func (t *FileDeleteTool) RequiresConfirmation(params map[string]interface{}) boo
 
 func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	path, _ := StringParam(params, "path")
+	path = ResolvePath(ctx, path)
 
 	// Check existence
 	info, err := os.Stat(path)
@@ -85,8 +86,10 @@ type DirCreateTool struct{}
 
 func NewDirCreateTool() *DirCreateTool { return &DirCreateTool{} }
 
-func (t *DirCreateTool) Name() string        { return "dir_create" }
-func (t *DirCreateTool) Description() string  { return "Create a directory (including parent directories)" }
+func (t *DirCreateTool) Name() string { return "dir_create" }
+func (t *DirCreateTool) Description() string {
+	return "Create a directory (including parent directories)"
+}
 func (t *DirCreateTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *DirCreateTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -108,6 +111,7 @@ func (t *DirCreateTool) RequiresConfirmation(params map[string]interface{}) bool
 
 func (t *DirCreateTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	path, _ := StringParam(params, "path")
+	path = ResolvePath(ctx, path)
 
 	if _, err := os.Stat(path); err == nil {
 		return &ToolResult{Output: fmt.Sprintf("Directory already exists: %s", path)}, nil

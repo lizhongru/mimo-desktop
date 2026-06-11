@@ -9,7 +9,9 @@ export function CancelOperation():Promise<void>;
 
 export function CompressContext():Promise<Record<string, number>>;
 
-export function CreateNewSession():Promise<string>;
+export function CreateNewSession(arg1:string):Promise<string>;
+
+export function CreateWorkspace(arg1:string):Promise<desktop.WorkspaceDTO>;
 
 export function DeleteSession(arg1:string):Promise<void>;
 
@@ -35,7 +37,11 @@ export function ListRemoteModelsWithConfig(arg1:string,arg2:string):Promise<Arra
 
 export function ListSessions(arg1:number):Promise<Array<desktop.SessionDTO>>;
 
+export function ListWorkspaces():Promise<Array<desktop.WorkspaceDTO>>;
+
 export function LoadSession(arg1:string):Promise<desktop.SessionData>;
+
+export function MoveSession(arg1:string,arg2:string):Promise<void>;
 
 export function OpenInExplorer(arg1:string):Promise<void>;
 
@@ -51,7 +57,7 @@ export function SaveSessionFromFrontend(arg1:string,arg2:Array<desktop.ChatMessa
 
 export function SelectDirectory():Promise<string>;
 
-export function SendMessage(arg1:string):Promise<void>;
+export function SendMessage(arg1:string,arg2:string):Promise<void>;
 
 export function SetDefaultModel(arg1:string):Promise<void>;
 

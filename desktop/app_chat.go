@@ -1,7 +1,8 @@
-﻿package desktop
+package desktop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,9 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"github.com/mimo-cli/mimo-cli/internal/llm"
+	"github.com/mimo-cli/mimo-cli/internal/tools"
 )
 
 // appVersion and appCommit are set at build time via -ldflags.
@@ -21,7 +25,8 @@ var (
 // Stored on App so CancelOperation can cancel the context.
 
 // SendMessage sends a user message and starts streaming the agent response.
-func (a *App) SendMessage(message string) error {
+// attachmentsJSON is an optional JSON array of {name, type, dataUrl} objects.
+func (a *App) SendMessage(message string, attachmentsJSON string) error {
 	a.mu.Lock()
 	if a.isBusy {
 		a.mu.Unlock()
@@ -35,6 +40,11 @@ func (a *App) SendMessage(message string) error {
 	runtime.EventsEmit(a.ctx, EventChatStart, message)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	workingDir := a.currentSessionWorkingDir()
+	a.agent.SystemPrompt(a.buildSystemPrompt(workingDir))
+	if workingDir != "" {
+		ctx = tools.WithWorkingDir(ctx, workingDir)
+	}
 	a.mu.Lock()
 	a.cancelChat = cancel
 	a.mu.Unlock()
@@ -48,8 +58,17 @@ func (a *App) SendMessage(message string) error {
 			a.mu.Unlock()
 		}()
 
+		// Parse attachments if provided
+		var attachments []llm.Attachment
+		if attachmentsJSON != "" {
+			if err := json.Unmarshal([]byte(attachmentsJSON), &attachments); err != nil {
+				runtime.EventsEmit(a.ctx, EventChatError, fmt.Sprintf("failed to parse attachments: %v", err))
+				return
+			}
+		}
+
 		start := time.Now()
-		response, err := a.agent.ChatStream(ctx, message)
+		response, err := a.agent.ChatStream(ctx, message, attachments)
 		duration := time.Since(start)
 
 		if err != nil {

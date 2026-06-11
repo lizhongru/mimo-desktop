@@ -15,8 +15,10 @@ type JSONQueryTool struct{}
 
 func NewJSONQueryTool() *JSONQueryTool { return &JSONQueryTool{} }
 
-func (t *JSONQueryTool) Name() string        { return "json_query" }
-func (t *JSONQueryTool) Description() string  { return "Read and query JSON/YAML files using dot-notation paths" }
+func (t *JSONQueryTool) Name() string { return "json_query" }
+func (t *JSONQueryTool) Description() string {
+	return "Read and query JSON/YAML files using dot-notation paths"
+}
 func (t *JSONQueryTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *JSONQueryTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -43,6 +45,7 @@ func (t *JSONQueryTool) RequiresConfirmation(params map[string]interface{}) bool
 func (t *JSONQueryTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	path, _ := StringParam(params, "path")
 	query, _ := StringParam(params, "query")
+	path = ResolvePath(ctx, path)
 
 	data, err := os.ReadFile(path)
 	if err != nil {

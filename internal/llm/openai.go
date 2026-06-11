@@ -1,13 +1,15 @@
-﻿package llm
+package llm
 
 import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -108,8 +110,24 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	}
 
 	choice := apiResp.Choices[0]
+	// Extract content string from raw message (may be string or array)
+	var contentStr string
+	if len(choice.Message.Content) > 0 {
+		if err := json.Unmarshal(choice.Message.Content, &contentStr); err != nil {
+			var parts []map[string]interface{}
+			if json.Unmarshal(choice.Message.Content, &parts) == nil {
+				var texts []string
+				for _, p := range parts {
+					if t, ok := p["text"].(string); ok {
+						texts = append(texts, t)
+					}
+				}
+				contentStr = strings.Join(texts, "\n")
+			}
+		}
+	}
 	result := &ChatResponse{
-		Content:      choice.Message.Content,
+		Content:      contentStr,
 		FinishReason: choice.FinishReason,
 		Usage: Usage{
 			PromptTokens:     apiResp.Usage.PromptTokens,
@@ -257,12 +275,105 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest) (<-cha
 	return ch, nil
 }
 
+const maxTextAttachmentChars = 200000
+
+// buildOpenAIContent builds the content field for OpenAI API.
+// When there are no attachments, it returns a JSON-quoted string.
+// When attachments exist, it returns a content array with text + image_url parts.
+func buildOpenAIContent(text string, attachments []Attachment) json.RawMessage {
+	if len(attachments) == 0 {
+		// Simple string content
+		raw, _ := json.Marshal(text)
+		return raw
+	}
+
+	// Build content array: [text_part, image_part, ...]
+	parts := []map[string]interface{}{}
+	if text != "" {
+		parts = append(parts, map[string]interface{}{
+			"type": "text",
+			"text": text,
+		})
+	}
+	for _, att := range attachments {
+		if strings.HasPrefix(att.Type, "image/") {
+			parts = append(parts, map[string]interface{}{
+				"type": "image_url",
+				"image_url": map[string]string{
+					"url": att.DataURL,
+				},
+			})
+		} else {
+			attachmentText := formatTextAttachment(att)
+			parts = append(parts, map[string]interface{}{
+				"type": "text",
+				"text": attachmentText,
+			})
+		}
+	}
+	raw, _ := json.Marshal(parts)
+	return raw
+}
+
+func formatTextAttachment(att Attachment) string {
+	decoded, ok := decodeTextAttachment(att)
+	if !ok {
+		return fmt.Sprintf("[Attached file: %s (%s)]", att.Name, att.Type)
+	}
+	if len(decoded) > maxTextAttachmentChars {
+		decoded = decoded[:maxTextAttachmentChars] + "\n[Attachment truncated]"
+	}
+	return fmt.Sprintf("[Attached file: %s (%s)]\n%s", att.Name, att.Type, decoded)
+}
+
+func decodeTextAttachment(att Attachment) (string, bool) {
+	if !isTextAttachment(att) {
+		return "", false
+	}
+	const marker = ";base64,"
+	if idx := strings.Index(att.DataURL, marker); idx >= 0 {
+		decoded, err := base64.StdEncoding.DecodeString(att.DataURL[idx+len(marker):])
+		if err != nil {
+			return "", false
+		}
+		return string(decoded), true
+	}
+	if idx := strings.Index(att.DataURL, ","); idx >= 0 {
+		decoded, err := url.QueryUnescape(att.DataURL[idx+1:])
+		if err != nil {
+			return "", false
+		}
+		return decoded, true
+	}
+	return "", false
+}
+
+func isTextAttachment(att Attachment) bool {
+	if strings.HasPrefix(att.Type, "text/") {
+		return true
+	}
+	switch strings.ToLower(att.Type) {
+	case "application/json", "application/javascript", "application/xml", "application/yaml", "application/x-yaml":
+		return true
+	}
+	name := strings.ToLower(att.Name)
+	for _, ext := range []string{
+		".md", ".markdown", ".txt", ".json", ".csv", ".tsv", ".yaml", ".yml", ".xml",
+		".js", ".jsx", ".ts", ".tsx", ".css", ".scss", ".html", ".go", ".py", ".java",
+		".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".toml", ".ini", ".env", ".sql",
+	} {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
+}
 func (p *OpenAIProvider) buildAPIRequest(req ChatRequest) openAIRequest {
 	apiReq := openAIRequest{
-		Model:       req.Model,
-		Messages:    make([]openAIMessage, len(req.Messages)),
-		MaxTokens:   req.MaxTokens,
-		Stream:      req.Stream,
+		Model:     req.Model,
+		Messages:  make([]openAIMessage, len(req.Messages)),
+		MaxTokens: req.MaxTokens,
+		Stream:    req.Stream,
 	}
 
 	if apiReq.Model == "" {
@@ -295,7 +406,7 @@ func (p *OpenAIProvider) buildAPIRequest(req ChatRequest) openAIRequest {
 	for i, msg := range req.Messages {
 		apiReq.Messages[i] = openAIMessage{
 			Role:       string(msg.Role),
-			Content:    msg.Content,
+			Content:    buildOpenAIContent(msg.Content, msg.Attachments),
 			ToolCallID: msg.ToolCallID,
 			Name:       msg.Name,
 		}
@@ -412,17 +523,17 @@ var knownCompatSuffixes = []string{
 // modelsEndpoint constructs the models endpoint URL from a base URL
 func modelsEndpoint(baseURL string) string {
 	cleaned := strings.TrimSuffix(baseURL, "/")
-	
+
 	// If already ends with /models, return as-is
 	if strings.HasSuffix(cleaned, "/models") {
 		return cleaned
 	}
-	
+
 	// If ends with /v1, append /models
 	if strings.HasSuffix(cleaned, "/v1") {
 		return cleaned + "/models"
 	}
-	
+
 	// Default: append /v1/models
 	return cleaned + "/v1/models"
 }
@@ -432,7 +543,7 @@ func buildModelsURLCandidates(baseURL string) []string {
 	candidates := []string{
 		modelsEndpoint(baseURL),
 	}
-	
+
 	// Check for known compat suffixes and try alternatives
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	for _, suffix := range knownCompatSuffixes {
@@ -443,27 +554,27 @@ func buildModelsURLCandidates(baseURL string) []string {
 			break
 		}
 	}
-	
+
 	return candidates
 }
 
 // ListModels fetches available models from the API
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	candidates := buildModelsURLCandidates(p.apiBase)
-	
+
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("no valid URL candidates")
 	}
-	
+
 	var lastErr error
-	
+
 	for _, url := range candidates {
 		models, err := p.fetchModelsFromURL(ctx, url)
 		if err == nil {
 			return models, nil
 		}
 		lastErr = err
-		
+
 		// If it's a 404/405, try next candidate
 		if strings.Contains(err.Error(), "status 404") || strings.Contains(err.Error(), "status 405") {
 			continue
@@ -471,7 +582,7 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		// For other errors (auth, network), fail immediately
 		return nil, err
 	}
-	
+
 	if lastErr != nil {
 		return nil, fmt.Errorf("all endpoints failed: %w", lastErr)
 	}
@@ -484,53 +595,53 @@ func (p *OpenAIProvider) fetchModelsFromURL(ctx context.Context, url string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
-	
+
 	resp, err := p.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode == 404 || resp.StatusCode == 405 {
 		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}
-	
+
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return nil, fmt.Errorf("authentication failed (status %d), please check your API key", resp.StatusCode)
 	}
-	
+
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
-	
+
 	// Try to parse response
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-	
+
 	// Parse the payload using flexible parsing
 	var payload interface{}
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
-	
+
 	modelIDs := parseModelPayload(payload)
 	if len(modelIDs) == 0 {
 		return nil, fmt.Errorf("no models found in response")
 	}
-	
+
 	// Convert to ModelInfo and enrich with capabilities
 	models := make([]ModelInfo, len(modelIDs))
 	for i, id := range modelIDs {
 		model := ModelInfo{ID: id}
 		models[i] = enrichModelInfo(model)
 	}
-	
+
 	return models, nil
 }
 
@@ -538,7 +649,7 @@ func (p *OpenAIProvider) fetchModelsFromURL(ctx context.Context, url string) ([]
 // Supports: string array, object array, data/models/items nested, single object
 func parseModelPayload(payload interface{}) []string {
 	var ids []string
-	
+
 	switch v := payload.(type) {
 	case []interface{}:
 		// Array at top level
@@ -563,14 +674,14 @@ func parseModelPayload(payload interface{}) []string {
 		// Single string
 		ids = append(ids, v)
 	}
-	
+
 	return deduplicateStrings(ids)
 }
 
 // extractModelID extracts model ID from an item (string or object)
 func extractModelID(item interface{}) []string {
 	var ids []string
-	
+
 	switch v := item.(type) {
 	case string:
 		// Direct string
@@ -586,7 +697,7 @@ func extractModelID(item interface{}) []string {
 			}
 		}
 	}
-	
+
 	return ids
 }
 
@@ -612,15 +723,15 @@ func (p *OpenAIProvider) setHeaders(req *http.Request) {
 // OpenAI API types (internal)
 
 type openAIRequest struct {
-	Model           string          `json:"model"`
-	Messages        []openAIMessage `json:"messages"`
-	Tools           []openAITool    `json:"tools,omitempty"`
-	MaxTokens       int             `json:"max_tokens,omitempty"`
-	Temperature     float64         `json:"temperature,omitempty"`
-	TopP            float64         `json:"top_p,omitempty"`
-	Stream          bool            `json:"stream"`
+	Model           string               `json:"model"`
+	Messages        []openAIMessage      `json:"messages"`
+	Tools           []openAITool         `json:"tools,omitempty"`
+	MaxTokens       int                  `json:"max_tokens,omitempty"`
+	Temperature     float64              `json:"temperature,omitempty"`
+	TopP            float64              `json:"top_p,omitempty"`
+	Stream          bool                 `json:"stream"`
 	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
-	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
+	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
 }
 
 type openAIStreamOptions struct {
@@ -629,7 +740,7 @@ type openAIStreamOptions struct {
 
 type openAIMessage struct {
 	Role       string           `json:"role"`
-	Content    string           `json:"content"`
+	Content    json.RawMessage  `json:"content"`
 	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 	Name       string           `json:"name,omitempty"`
@@ -648,8 +759,8 @@ type openAIFunctionCall struct {
 }
 
 type openAITool struct {
-	Type     string              `json:"type"`
-	Function openAIToolFunction  `json:"function"`
+	Type     string             `json:"type"`
+	Function openAIToolFunction `json:"function"`
 }
 
 type openAIToolFunction struct {
@@ -659,9 +770,9 @@ type openAIToolFunction struct {
 }
 
 type openAIResponse struct {
-	ID      string           `json:"id"`
-	Choices []openAIChoice   `json:"choices"`
-	Usage   openAIUsage      `json:"usage"`
+	ID      string         `json:"id"`
+	Choices []openAIChoice `json:"choices"`
+	Usage   openAIUsage    `json:"usage"`
 }
 
 type openAIChoice struct {

@@ -65,14 +65,7 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 	path, _ := StringParam(params, "path")
 	content, _ := StringParam(params, "content")
 
-	// Resolve relative path
-	if !filepath.IsAbs(path) {
-		wd, err := os.Getwd()
-		if err != nil {
-			return ToolError("failed to get working directory: %v", err), nil
-		}
-		path = filepath.Join(wd, path)
-	}
+	path = ResolvePath(ctx, path)
 
 	// Create directories if requested
 	if createDirs, ok := params["create_dirs"].(bool); ok && createDirs {

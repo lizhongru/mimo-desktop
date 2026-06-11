@@ -172,10 +172,10 @@ export namespace desktop {
 	
 	export class SessionDTO {
 	    id: string;
+	    workspaceId: string;
 	    modelName: string;
 	    userName: string;
 	    lastMessage: string;
-	    workingDir: string;
 	    createdAt: string;
 	    updatedAt: string;
 	
@@ -186,16 +186,17 @@ export namespace desktop {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.workspaceId = source["workspaceId"];
 	        this.modelName = source["modelName"];
 	        this.userName = source["userName"];
 	        this.lastMessage = source["lastMessage"];
-	        this.workingDir = source["workingDir"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
 	export class SessionData {
 	    id: string;
+	    workspaceId: string;
 	    modelName: string;
 	    messages: ChatMessageDTO[];
 	
@@ -206,6 +207,7 @@ export namespace desktop {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.workspaceId = source["workspaceId"];
 	        this.modelName = source["modelName"];
 	        this.messages = this.convertValues(source["messages"], ChatMessageDTO);
 	    }
@@ -246,6 +248,24 @@ export namespace desktop {
 	        this.safetyLevel = source["safetyLevel"];
 	        this.isMcp = source["isMcp"];
 	        this.serverName = source["serverName"];
+	    }
+	}
+	export class WorkspaceDTO {
+	    id: string;
+	    name: string;
+	    type: string;
+	    path: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.path = source["path"];
 	    }
 	}
 

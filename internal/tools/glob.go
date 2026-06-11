@@ -16,8 +16,8 @@ type GlobTool struct {
 
 func NewGlobTool(ign *ignore.Matcher) *GlobTool { return &GlobTool{ign: ign} }
 
-func (t *GlobTool) Name() string        { return "glob" }
-func (t *GlobTool) Description() string  { return "Find files matching a glob pattern" }
+func (t *GlobTool) Name() string                { return "glob" }
+func (t *GlobTool) Description() string         { return "Find files matching a glob pattern" }
 func (t *GlobTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 
 func (t *GlobTool) Parameters() map[string]interface{} {
@@ -51,10 +51,7 @@ func (t *GlobTool) Execute(ctx context.Context, params map[string]interface{}) (
 	if v, err := StringParam(params, "path"); err == nil && v != "" {
 		dir = v
 	}
-	if !filepath.IsAbs(dir) {
-		wd, _ := os.Getwd()
-		dir = filepath.Join(wd, dir)
-	}
+	dir = ResolvePath(ctx, dir)
 
 	// Handle ** patterns by walking the directory
 	if strings.Contains(pattern, "**") {

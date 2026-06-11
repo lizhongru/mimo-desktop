@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mimo-cli/mimo-cli/internal/backup"
@@ -79,14 +78,7 @@ func (t *FileEditTool) Execute(ctx context.Context, params map[string]interface{
 		replaceAll = v
 	}
 
-	// Resolve relative path
-	if !filepath.IsAbs(path) {
-		wd, err := os.Getwd()
-		if err != nil {
-			return ToolError("failed to get working directory: %v", err), nil
-		}
-		path = filepath.Join(wd, path)
-	}
+	path = ResolvePath(ctx, path)
 
 	// Read file
 	data, err := os.ReadFile(path)

@@ -1,4 +1,4 @@
-﻿package llm
+package llm
 
 // Role represents the role of a message sender
 type Role string
@@ -12,11 +12,19 @@ const (
 
 // Message represents a single message in the conversation
 type Message struct {
-	Role       Role       `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	Name       string     `json:"name,omitempty"`
+	Role        Role         `json:"role"`
+	Content     string       `json:"content"`
+	Attachments []Attachment `json:"attachments,omitempty"`
+	ToolCalls   []ToolCall   `json:"tool_calls,omitempty"`
+	ToolCallID  string       `json:"tool_call_id,omitempty"`
+	Name        string       `json:"name,omitempty"`
+}
+
+// Attachment represents a file attachment (image or document)
+type Attachment struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`    // MIME type, e.g. "image/png", "application/pdf"
+	DataURL string `json:"dataUrl"` // data:... base64 URL
 }
 
 // ToolCall represents a tool call from the model

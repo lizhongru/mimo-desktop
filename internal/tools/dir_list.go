@@ -17,8 +17,8 @@ type DirListTool struct {
 
 func NewDirListTool(ign *ignore.Matcher) *DirListTool { return &DirListTool{ign: ign} }
 
-func (t *DirListTool) Name() string        { return "dir_list" }
-func (t *DirListTool) Description() string  { return "List files and directories at the given path" }
+func (t *DirListTool) Name() string                { return "dir_list" }
+func (t *DirListTool) Description() string         { return "List files and directories at the given path" }
 func (t *DirListTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 
 func (t *DirListTool) Parameters() map[string]interface{} {
@@ -56,10 +56,7 @@ func (t *DirListTool) Execute(ctx context.Context, params map[string]interface{}
 		dir = v
 	}
 
-	if !filepath.IsAbs(dir) {
-		wd, _ := os.Getwd()
-		dir = filepath.Join(wd, dir)
-	}
+	dir = ResolvePath(ctx, dir)
 
 	info, err := os.Stat(dir)
 	if err != nil {

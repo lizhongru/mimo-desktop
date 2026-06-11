@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,8 +14,8 @@ type GitStatusTool struct{}
 
 func NewGitStatusTool() *GitStatusTool { return &GitStatusTool{} }
 
-func (t *GitStatusTool) Name() string        { return "git_status" }
-func (t *GitStatusTool) Description() string  { return "Show the working tree status" }
+func (t *GitStatusTool) Name() string                { return "git_status" }
+func (t *GitStatusTool) Description() string         { return "Show the working tree status" }
 func (t *GitStatusTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *GitStatusTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -25,7 +24,7 @@ func (t *GitStatusTool) Parameters() map[string]interface{} {
 		"required":   []string{},
 	}
 }
-func (t *GitStatusTool) Validate(params map[string]interface{}) error { return nil }
+func (t *GitStatusTool) Validate(params map[string]interface{}) error            { return nil }
 func (t *GitStatusTool) RequiresConfirmation(params map[string]interface{}) bool { return false }
 
 func (t *GitStatusTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
@@ -40,7 +39,9 @@ func (t *GitStatusTool) Execute(ctx context.Context, params map[string]interface
 	var sb strings.Builder
 	var staged, unstaged, untracked []string
 	for _, line := range strings.Split(out, "\n") {
-		if len(line) < 4 { continue }
+		if len(line) < 4 {
+			continue
+		}
 		code := line[:2]
 		file := strings.TrimSpace(line[3:])
 		switch {
@@ -58,13 +59,17 @@ func (t *GitStatusTool) Execute(ctx context.Context, params map[string]interface
 		sb.WriteString("\n")
 	}
 	if len(unstaged) > 0 {
-		if sb.Len() > 0 { sb.WriteString("\n") }
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
 		sb.WriteString(fmt.Sprintf("Unstaged (%d):\n", len(unstaged)))
 		sb.WriteString(strings.Join(unstaged, "\n"))
 		sb.WriteString("\n")
 	}
 	if len(untracked) > 0 {
-		if sb.Len() > 0 { sb.WriteString("\n") }
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
 		sb.WriteString(fmt.Sprintf("Untracked (%d):\n", len(untracked)))
 		sb.WriteString(strings.Join(untracked, "\n"))
 		sb.WriteString("\n")
@@ -78,8 +83,8 @@ type GitDiffTool struct{}
 
 func NewGitDiffTool() *GitDiffTool { return &GitDiffTool{} }
 
-func (t *GitDiffTool) Name() string        { return "git_diff" }
-func (t *GitDiffTool) Description() string  { return "Show changes between commits or working tree" }
+func (t *GitDiffTool) Name() string                { return "git_diff" }
+func (t *GitDiffTool) Description() string         { return "Show changes between commits or working tree" }
 func (t *GitDiffTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *GitDiffTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -97,7 +102,7 @@ func (t *GitDiffTool) Parameters() map[string]interface{} {
 		"required": []string{},
 	}
 }
-func (t *GitDiffTool) Validate(params map[string]interface{}) error { return nil }
+func (t *GitDiffTool) Validate(params map[string]interface{}) error            { return nil }
 func (t *GitDiffTool) RequiresConfirmation(params map[string]interface{}) bool { return false }
 
 func (t *GitDiffTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
@@ -149,8 +154,8 @@ type GitLogTool struct{}
 
 func NewGitLogTool() *GitLogTool { return &GitLogTool{} }
 
-func (t *GitLogTool) Name() string        { return "git_log" }
-func (t *GitLogTool) Description() string  { return "Show commit logs" }
+func (t *GitLogTool) Name() string                { return "git_log" }
+func (t *GitLogTool) Description() string         { return "Show commit logs" }
 func (t *GitLogTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *GitLogTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -168,7 +173,7 @@ func (t *GitLogTool) Parameters() map[string]interface{} {
 		"required": []string{},
 	}
 }
-func (t *GitLogTool) Validate(params map[string]interface{}) error { return nil }
+func (t *GitLogTool) Validate(params map[string]interface{}) error            { return nil }
 func (t *GitLogTool) RequiresConfirmation(params map[string]interface{}) bool { return false }
 
 func (t *GitLogTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
@@ -197,8 +202,8 @@ type GitCommitTool struct{}
 
 func NewGitCommitTool() *GitCommitTool { return &GitCommitTool{} }
 
-func (t *GitCommitTool) Name() string        { return "git_commit" }
-func (t *GitCommitTool) Description() string  { return "Stage files and create a git commit" }
+func (t *GitCommitTool) Name() string                { return "git_commit" }
+func (t *GitCommitTool) Description() string         { return "Stage files and create a git commit" }
 func (t *GitCommitTool) GetSafetyLevel() SafetyLevel { return SafetyMedium }
 func (t *GitCommitTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -263,9 +268,8 @@ func (t *GitCommitTool) Execute(ctx context.Context, params map[string]interface
 // --- helper ---
 
 func runGit(ctx context.Context, args ...string) (string, error) {
-	wd, _ := os.Getwd()
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = wd
+	cmd.Dir = WorkingDir(ctx)
 	out, err := cmd.CombinedOutput()
 	result := strings.TrimSpace(string(out))
 	if err != nil {
@@ -287,8 +291,8 @@ type GitBranchTool struct{}
 
 func NewGitBranchTool() *GitBranchTool { return &GitBranchTool{} }
 
-func (t *GitBranchTool) Name() string        { return "git_branch" }
-func (t *GitBranchTool) Description() string  { return "List, create, or delete git branches" }
+func (t *GitBranchTool) Name() string                { return "git_branch" }
+func (t *GitBranchTool) Description() string         { return "List, create, or delete git branches" }
 func (t *GitBranchTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *GitBranchTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -306,7 +310,7 @@ func (t *GitBranchTool) Parameters() map[string]interface{} {
 		"required": []string{},
 	}
 }
-func (t *GitBranchTool) Validate(params map[string]interface{}) error      { return nil }
+func (t *GitBranchTool) Validate(params map[string]interface{}) error            { return nil }
 func (t *GitBranchTool) RequiresConfirmation(params map[string]interface{}) bool { return false }
 
 func (t *GitBranchTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
@@ -355,8 +359,8 @@ type GitCheckoutTool struct{}
 
 func NewGitCheckoutTool() *GitCheckoutTool { return &GitCheckoutTool{} }
 
-func (t *GitCheckoutTool) Name() string        { return "git_checkout" }
-func (t *GitCheckoutTool) Description() string  { return "Switch branches or restore files" }
+func (t *GitCheckoutTool) Name() string                { return "git_checkout" }
+func (t *GitCheckoutTool) Description() string         { return "Switch branches or restore files" }
 func (t *GitCheckoutTool) GetSafetyLevel() SafetyLevel { return SafetyMedium }
 func (t *GitCheckoutTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -400,8 +404,8 @@ type GitMergeTool struct{}
 
 func NewGitMergeTool() *GitMergeTool { return &GitMergeTool{} }
 
-func (t *GitMergeTool) Name() string        { return "git_merge" }
-func (t *GitMergeTool) Description() string  { return "Merge a branch into the current branch" }
+func (t *GitMergeTool) Name() string                { return "git_merge" }
+func (t *GitMergeTool) Description() string         { return "Merge a branch into the current branch" }
 func (t *GitMergeTool) GetSafetyLevel() SafetyLevel { return SafetyMedium }
 func (t *GitMergeTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{

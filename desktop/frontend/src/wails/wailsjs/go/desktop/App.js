@@ -14,8 +14,12 @@ export function CompressContext() {
   return window['go']['desktop']['App']['CompressContext']();
 }
 
-export function CreateNewSession() {
-  return window['go']['desktop']['App']['CreateNewSession']();
+export function CreateNewSession(arg1) {
+  return window['go']['desktop']['App']['CreateNewSession'](arg1);
+}
+
+export function CreateWorkspace(arg1) {
+  return window['go']['desktop']['App']['CreateWorkspace'](arg1);
 }
 
 export function DeleteSession(arg1) {
@@ -66,8 +70,16 @@ export function ListSessions(arg1) {
   return window['go']['desktop']['App']['ListSessions'](arg1);
 }
 
+export function ListWorkspaces() {
+  return window['go']['desktop']['App']['ListWorkspaces']();
+}
+
 export function LoadSession(arg1) {
   return window['go']['desktop']['App']['LoadSession'](arg1);
+}
+
+export function MoveSession(arg1, arg2) {
+  return window['go']['desktop']['App']['MoveSession'](arg1, arg2);
 }
 
 export function OpenInExplorer(arg1) {
@@ -98,8 +110,8 @@ export function SelectDirectory() {
   return window['go']['desktop']['App']['SelectDirectory']();
 }
 
-export function SendMessage(arg1) {
-  return window['go']['desktop']['App']['SendMessage'](arg1);
+export function SendMessage(arg1, arg2) {
+  return window['go']['desktop']['App']['SendMessage'](arg1, arg2);
 }
 
 export function SetDefaultModel(arg1) {

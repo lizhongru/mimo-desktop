@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -56,14 +55,7 @@ func (t *FileReadTool) RequiresConfirmation(params map[string]interface{}) bool 
 func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	path, _ := StringParam(params, "path")
 
-	// Resolve relative path
-	if !filepath.IsAbs(path) {
-		wd, err := os.Getwd()
-		if err != nil {
-			return ToolError("failed to get working directory: %v", err), nil
-		}
-		path = filepath.Join(wd, path)
-	}
+	path = ResolvePath(ctx, path)
 
 	// Check if file exists
 	info, err := os.Stat(path)

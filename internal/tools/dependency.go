@@ -12,8 +12,10 @@ type DependencyTool struct{}
 
 func NewDependencyTool() *DependencyTool { return &DependencyTool{} }
 
-func (t *DependencyTool) Name() string        { return "dependency" }
-func (t *DependencyTool) Description() string  { return "Manage project dependencies (auto-detects npm/pip/go/cargo)" }
+func (t *DependencyTool) Name() string { return "dependency" }
+func (t *DependencyTool) Description() string {
+	return "Manage project dependencies (auto-detects npm/pip/go/cargo)"
+}
 func (t *DependencyTool) GetSafetyLevel() SafetyLevel { return SafetyMedium }
 func (t *DependencyTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -45,7 +47,7 @@ func (t *DependencyTool) Execute(ctx context.Context, params map[string]interfac
 	action, _ := StringParam(params, "action")
 	pkg, _ := StringParam(params, "package")
 
-	wd, _ := os.Getwd()
+	wd := WorkingDir(ctx)
 	pm := detectPackageManager(wd)
 	if pm == "" {
 		return ToolError("no package manager detected (checked package.json, requirements.txt, go.mod, Cargo.toml)"), nil
@@ -60,10 +62,14 @@ func (t *DependencyTool) Execute(ctx context.Context, params map[string]interfac
 		case "list":
 			cmd = exec.CommandContext(ctx, "npm", "list", "--depth=0")
 		case "add":
-			if pkg == "" { return ToolError("package name required for add"), nil }
+			if pkg == "" {
+				return ToolError("package name required for add"), nil
+			}
 			cmd = exec.CommandContext(ctx, "npm", "install", pkg)
 		case "remove":
-			if pkg == "" { return ToolError("package name required for remove"), nil }
+			if pkg == "" {
+				return ToolError("package name required for remove"), nil
+			}
 			cmd = exec.CommandContext(ctx, "npm", "uninstall", pkg)
 		}
 	case "pip":
@@ -73,10 +79,14 @@ func (t *DependencyTool) Execute(ctx context.Context, params map[string]interfac
 		case "list":
 			cmd = exec.CommandContext(ctx, "pip", "list")
 		case "add":
-			if pkg == "" { return ToolError("package name required for add"), nil }
+			if pkg == "" {
+				return ToolError("package name required for add"), nil
+			}
 			cmd = exec.CommandContext(ctx, "pip", "install", pkg)
 		case "remove":
-			if pkg == "" { return ToolError("package name required for remove"), nil }
+			if pkg == "" {
+				return ToolError("package name required for remove"), nil
+			}
 			cmd = exec.CommandContext(ctx, "pip", "uninstall", "-y", pkg)
 		}
 	case "go":
@@ -86,10 +96,14 @@ func (t *DependencyTool) Execute(ctx context.Context, params map[string]interfac
 		case "list":
 			cmd = exec.CommandContext(ctx, "go", "list", "-m", "all")
 		case "add":
-			if pkg == "" { return ToolError("package path required for add"), nil }
+			if pkg == "" {
+				return ToolError("package path required for add"), nil
+			}
 			cmd = exec.CommandContext(ctx, "go", "get", pkg)
 		case "remove":
-			if pkg == "" { return ToolError("package path required for remove"), nil }
+			if pkg == "" {
+				return ToolError("package path required for remove"), nil
+			}
 			cmd = exec.CommandContext(ctx, "go", "get", pkg+"@none")
 		}
 	case "cargo":
@@ -99,10 +113,14 @@ func (t *DependencyTool) Execute(ctx context.Context, params map[string]interfac
 		case "list":
 			cmd = exec.CommandContext(ctx, "cargo", "tree", "--depth=1")
 		case "add":
-			if pkg == "" { return ToolError("package name required for add"), nil }
+			if pkg == "" {
+				return ToolError("package name required for add"), nil
+			}
 			cmd = exec.CommandContext(ctx, "cargo", "add", pkg)
 		case "remove":
-			if pkg == "" { return ToolError("package name required for remove"), nil }
+			if pkg == "" {
+				return ToolError("package name required for remove"), nil
+			}
 			cmd = exec.CommandContext(ctx, "cargo", "remove", pkg)
 		}
 	}

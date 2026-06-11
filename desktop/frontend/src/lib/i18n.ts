@@ -125,6 +125,7 @@ type TranslationKey =
   | "perm_exec"
   | "permission_label"
   | "attach_file"
+  | "attach_folder"
   | "drop_to_add"
   | "reasoning_low"
   | "reasoning_medium"
@@ -143,6 +144,7 @@ type TranslationKey =
   | "welcome_subtitle"
   | "welcome_input_placeholder"
   | "welcome_hint"
+  | "no_project"
   | "select_workspace"
   | "recent_workspaces"
   | "no_recent_workspaces"
@@ -181,6 +183,10 @@ type TranslationKey =
 | "provider_name"
 | "api_base_url"
 | "search_models"
+| "no_models_found"
+| "back"
+| "conversations"
+| "click_to_settings"
 | "fetching"
 | "selected"
 | "click_to_set_default"
@@ -339,7 +345,8 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     perm_write: "读写",
     perm_exec: "完全访问",
     permission_label: "MiMo ????",
-    attach_file: "??",
+    attach_file: "添加文件",
+    attach_folder: "添加文件夹",
     drop_to_add: "松手即可添加",
     reasoning_low: "低推理",
     reasoning_medium: "中推理",
@@ -358,6 +365,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     welcome_subtitle: "AI 驱动的编程助手",
     welcome_input_placeholder: "描述你想做的事情...",
     welcome_hint: "按 Enter 发送，Shift+Enter 换行",
+    no_project: "不关联项目",
     select_workspace: "选择工作区",
     recent_workspaces: "最近使用",
     no_recent_workspaces: "暂无最近工作区",
@@ -397,6 +405,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     provider_name: "供应商名称",
     api_base_url: "API 地址",
     search_models: "搜索模型...",
+    no_models_found: "未找到模型",
+    back: "返回",
+    conversations: "对话",
+    click_to_settings: "点击打开设置",
     fetching: "获取中...",
     selected: "已选择",
     click_to_set_default: "点击设为默认模型",
@@ -558,6 +570,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     perm_exec: "Full Access",
     permission_label: "MiMo Permission",
     attach_file: "Attach file",
+    attach_folder: "Attach folder",
     drop_to_add: "松手即可添加",
     reasoning_low: "Low",
     reasoning_medium: "Medium",
@@ -576,6 +589,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     welcome_subtitle: "AI-powered coding assistant",
     welcome_input_placeholder: "Describe what you want to do...",
     welcome_hint: "Press Enter to send, Shift+Enter for new line",
+    no_project: "No project",
     select_workspace: "Select workspace",
     recent_workspaces: "Recent",
     no_recent_workspaces: "No recent workspaces",
@@ -615,6 +629,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     provider_name: "Provider Name",
     api_base_url: "API Base URL",
     search_models: "Search models...",
+    no_models_found: "No models found",
+    back: "Back",
+    conversations: "Conversations",
+    click_to_settings: "Click to open settings",
     fetching: "Fetching...",
     selected: "Selected",
     click_to_set_default: "Click to set as default",

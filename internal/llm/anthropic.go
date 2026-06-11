@@ -1,4 +1,4 @@
-﻿package llm
+package llm
 
 import (
 	"bufio"
@@ -253,7 +253,7 @@ func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest) (<-
 								},
 							},
 						}
-				}
+					}
 
 				case "message_delta":
 					// Contains stop_reason and final output usage
@@ -281,8 +281,8 @@ func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest) (<-
 					ch <- StreamChunk{FinishReason: "stop"}
 					return
 				}
-				}
 			}
+		}
 
 		if err := scanner.Err(); err != nil {
 			ch <- StreamChunk{Error: fmt.Errorf("stream read error: %w", err)}
@@ -294,9 +294,9 @@ func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest) (<-
 
 func (p *AnthropicProvider) buildAPIRequest(req ChatRequest, stream bool) anthropicRequest {
 	apiReq := anthropicRequest{
-		Model:       req.Model,
-		MaxTokens:   req.MaxTokens,
-		Stream:      stream,
+		Model:     req.Model,
+		MaxTokens: req.MaxTokens,
+		Stream:    stream,
 	}
 
 	if apiReq.Model == "" {
@@ -366,14 +366,10 @@ func (p *AnthropicProvider) buildAPIRequest(req ChatRequest, stream bool) anthro
 		}
 
 		// Normal user/assistant message
+		content := buildAnthropicContent(msg.Content, msg.Attachments)
 		apiReq.Messages = append(apiReq.Messages, anthropicMessage{
-			Role: string(msg.Role),
-			Content: []anthropicContent{
-				{
-					Type: "text",
-					Text: msg.Content,
-				},
-			},
+			Role:    string(msg.Role),
+			Content: content,
 		})
 	}
 
@@ -392,6 +388,49 @@ func (p *AnthropicProvider) buildAPIRequest(req ChatRequest, stream bool) anthro
 	}
 
 	return apiReq
+}
+
+func buildAnthropicContent(text string, attachments []Attachment) []anthropicContent {
+	content := []anthropicContent{}
+	if text != "" || len(attachments) == 0 {
+		content = append(content, anthropicContent{
+			Type: "text",
+			Text: text,
+		})
+	}
+	for _, att := range attachments {
+		if strings.HasPrefix(att.Type, "image/") {
+			if source, ok := parseAnthropicImageSource(att); ok {
+				content = append(content, anthropicContent{
+					Type:   "image",
+					Source: source,
+				})
+			}
+			continue
+		}
+		content = append(content, anthropicContent{
+			Type: "text",
+			Text: formatTextAttachment(att),
+		})
+	}
+	return content
+}
+
+func parseAnthropicImageSource(att Attachment) (*anthropicImageSource, bool) {
+	const marker = ";base64,"
+	idx := strings.Index(att.DataURL, marker)
+	if idx < 0 {
+		return nil, false
+	}
+	mediaType := strings.TrimPrefix(att.DataURL[:idx], "data:")
+	if mediaType == "" {
+		mediaType = att.Type
+	}
+	return &anthropicImageSource{
+		Type:      "base64",
+		MediaType: mediaType,
+		Data:      att.DataURL[idx+len(marker):],
+	}, true
 }
 
 func (p *AnthropicProvider) setHeaders(req *http.Request) {
@@ -413,8 +452,8 @@ type anthropicRequest struct {
 }
 
 type anthropicMessage struct {
-	Role    string              `json:"role"`
-	Content []anthropicContent  `json:"content"`
+	Role    string             `json:"role"`
+	Content []anthropicContent `json:"content"`
 }
 
 type anthropicContent struct {
@@ -423,9 +462,16 @@ type anthropicContent struct {
 	ID        string                 `json:"id,omitempty"`
 	Name      string                 `json:"name,omitempty"`
 	Input     map[string]interface{} `json:"input,omitempty"`
+	Source    *anthropicImageSource  `json:"source,omitempty"`
 	ToolUseID string                 `json:"tool_use_id,omitempty"`
 	Content   string                 `json:"content,omitempty"`
 	Thinking  string                 `json:"thinking,omitempty"`
+}
+
+type anthropicImageSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
 }
 
 // toolUseContent is used for marshaling tool_use blocks with required input field
@@ -438,11 +484,12 @@ type toolUseContent struct {
 
 // textContent is used for marshaling text and other content blocks without input field
 type textContent struct {
-	Type      string `json:"type"`
-	Text      string `json:"text,omitempty"`
-	Thinking  string `json:"thinking,omitempty"`
-	ToolUseID string `json:"tool_use_id,omitempty"`
-	Content   string `json:"content,omitempty"`
+	Type      string                `json:"type"`
+	Text      string                `json:"text,omitempty"`
+	Thinking  string                `json:"thinking,omitempty"`
+	ToolUseID string                `json:"tool_use_id,omitempty"`
+	Content   string                `json:"content,omitempty"`
+	Source    *anthropicImageSource `json:"source,omitempty"`
 }
 
 // MarshalJSON custom marshaler to handle the Input field correctly
@@ -465,6 +512,7 @@ func (c anthropicContent) MarshalJSON() ([]byte, error) {
 		Thinking:  c.Thinking,
 		ToolUseID: c.ToolUseID,
 		Content:   c.Content,
+		Source:    c.Source,
 	})
 }
 
@@ -487,12 +535,12 @@ type anthropicUsage struct {
 }
 
 type anthropicStreamEvent struct {
-	Type         string               `json:"type"`
-	Index        int                  `json:"index"`
-	Delta        anthropicDelta       `json:"delta"`
+	Type         string                `json:"type"`
+	Index        int                   `json:"index"`
+	Delta        anthropicDelta        `json:"delta"`
 	ContentBlock anthropicContentBlock `json:"content_block"`
-	Message      *anthropicResponse   `json:"message"`
-	Usage        *anthropicUsage      `json:"usage"`
+	Message      *anthropicResponse    `json:"message"`
+	Usage        *anthropicUsage       `json:"usage"`
 }
 
 type anthropicDelta struct {

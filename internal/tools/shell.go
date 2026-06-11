@@ -63,6 +63,7 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 		timeout = t
 	}
 	workingDir := OptionalStringParam(params, "working_dir", "")
+	workingDir = ResolvePath(ctx, workingDir)
 
 	// Create command with timeout
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
@@ -75,9 +76,7 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
 
-	if workingDir != "" {
-		cmd.Dir = workingDir
-	}
+	cmd.Dir = workingDir
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

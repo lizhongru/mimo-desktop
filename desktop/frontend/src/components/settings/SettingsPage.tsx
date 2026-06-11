@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Settings as SettingsIcon,
@@ -106,7 +106,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
 
   const handleSetDefault = (name: string) => {
     window.go?.desktop?.App?.SetDefaultModel?.(name)
-      .then(() => setCurrentModel(name))
+      .then(() => { setCurrentModel(name); useSettingsStore.getState().refreshModels(); })
       .catch(console.error);
   };
 
@@ -118,8 +118,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
           delete next[name];
           return next;
         });
-      })
-      .catch(console.error);
+      }).then(() => { useSettingsStore.getState().refreshModels(); }).catch(console.error);
   };
 
   const SafetyBadge = ({ level }: { level: string }) => {
@@ -399,6 +398,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                     cfg.temperature, cfg.topP, cfg.streaming, cfg.vision, cfg.tools
                   ).then(() => {
                     setModels((prev) => ({ ...prev, [name]: cfg }));
+                    useSettingsStore.getState().refreshModels();
                   }).catch(console.error);
                 }}
                 onUpdate={(name, cfg) => {
@@ -408,6 +408,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                     cfg.temperature, cfg.topP, cfg.streaming, cfg.vision, cfg.tools
                   ).then(() => {
                     setModels((prev) => ({ ...prev, [name]: cfg }));
+                    useSettingsStore.getState().refreshModels();
                   }).catch(console.error);
                 }}
               />

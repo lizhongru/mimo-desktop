@@ -12,8 +12,8 @@ type FileDiffTool struct{}
 
 func NewFileDiffTool() *FileDiffTool { return &FileDiffTool{} }
 
-func (t *FileDiffTool) Name() string        { return "file_diff" }
-func (t *FileDiffTool) Description() string  { return "Compare two files and show differences" }
+func (t *FileDiffTool) Name() string                { return "file_diff" }
+func (t *FileDiffTool) Description() string         { return "Compare two files and show differences" }
 func (t *FileDiffTool) GetSafetyLevel() SafetyLevel { return SafetyLow }
 func (t *FileDiffTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -43,6 +43,8 @@ func (t *FileDiffTool) RequiresConfirmation(params map[string]interface{}) bool 
 func (t *FileDiffTool) Execute(ctx context.Context, params map[string]interface{}) (*ToolResult, error) {
 	pathA, _ := StringParam(params, "path_a")
 	pathB, _ := StringParam(params, "path_b")
+	pathA = ResolvePath(ctx, pathA)
+	pathB = ResolvePath(ctx, pathB)
 
 	dataA, err := os.ReadFile(pathA)
 	if err != nil {

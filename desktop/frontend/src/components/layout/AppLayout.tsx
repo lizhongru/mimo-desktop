@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useActivityStore } from "../../stores/activityStore";
@@ -20,7 +20,6 @@ import {
   X,
   Copy,
   Wrench,
-  Paperclip,
 } from "lucide-react";
 import { t } from "../../lib/i18n";
 
@@ -31,7 +30,7 @@ function formatTokens(n: number): string {
 
 interface Props {
   modelName: string;
-  onSend: (message: string) => void;
+  onSend: (message: string, attachments?: { name: string; type: string; dataUrl: string }[]) => void;
   onCancel: () => void;
   onNewChat: () => void;
   onLoadSession: (id: string) => void;
@@ -40,7 +39,7 @@ interface Props {
   onConfirmApprove: () => void;
   onConfirmDeny: () => void;
   onConfirmApproveAll: () => void;
-  onSelectWorkspace: (dir: string) => void;
+  onSelectWorkspace: (dir: string) => Promise<void>;
 }
 
 export function AppLayout({
@@ -64,8 +63,10 @@ export function AppLayout({
   const usage = useChatStore((s) => s.usage);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+
   const [isMaximised, setIsMaximised] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounter = useRef(0);
 
   useEffect(() => {
     window.go?.desktop?.App?.WindowIsMaximised?.()
@@ -86,31 +87,13 @@ export function AppLayout({
     }, 100);
   }, []);
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.types.includes("Files")) setDragOver(true);
-  }, []);
-
   const handleClose = useCallback(() => {
     window.go?.desktop?.App?.WindowClose?.().catch(console.error);
   }, []);
 
   return (
     <div
-      className="h-screen flex flex-col bg-root text-txt select-none relative"
-      onDragEnter={handleDragEnter}
-      onDragLeave={(e) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); }}
-    >
-      {dragOver && (
-        <div className="absolute inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="bg-surface border-2 border-dashed border-accent rounded-2xl px-8 py-6 flex flex-col items-center gap-3 animate-fade-in">
-            <Paperclip className="w-8 h-8 text-accent" />
-            <span className="text-sm font-medium text-txt">{t("drop_to_add")}</span>
-          </div>
-        </div>
-      )}
+      className={`h-screen flex flex-col bg-root text-txt select-none relative ${dragActive ? "drag-active" : ""}`} onDragEnter={(e) => { e.preventDefault(); dragCounter.current += 1; if (dragCounter.current === 1) setDragActive(true); }} onDragLeave={(e) => { e.preventDefault(); dragCounter.current -= 1; if (dragCounter.current <= 0) { dragCounter.current = 0; setDragActive(false); } }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); dragCounter.current = 0; setDragActive(false); }}>
       {/* Modern Title Bar */}
       <div className="relative h-10 flex items-center border-b border-bdr-div bg-root flex-shrink-0 drag-region">
         {/* Left: sidebar toggle */}
@@ -189,7 +172,7 @@ export function AppLayout({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
         <div
-          className={`border-r border-bdr bg-sidebar transition-all duration-200 flex-shrink-0 overflow-hidden ${
+          className={`border-r border-bdr bg-sidebar transition-all duration-200 flex-shrink-0 overflow-hidden relative z-10 ${
             leftOpen ? "w-[260px]" : "w-0"
           }`}
         >

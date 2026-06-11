@@ -1,4 +1,4 @@
-﻿package agent
+package agent
 
 import (
 	"context"
@@ -202,14 +202,15 @@ func (a *Agent) SystemPrompt(prompt string) {
 }
 
 // Chat sends a message and runs the agent loop
-func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
+func (a *Agent) Chat(ctx context.Context, userMessage string, attachments []llm.Attachment) (string, error) {
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(ctx)
 	a.mu.Lock()
 	a.cancelFunc = cancel
 	a.messages = append(a.messages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: userMessage,
+		Role:        llm.RoleUser,
+		Content:     userMessage,
+		Attachments: attachments,
 	})
 	a.compressContext(ctx)
 	a.mu.Unlock()
@@ -225,14 +226,15 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 }
 
 // ChatStream sends a message and streams the response
-func (a *Agent) ChatStream(ctx context.Context, userMessage string) (string, error) {
+func (a *Agent) ChatStream(ctx context.Context, userMessage string, attachments []llm.Attachment) (string, error) {
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(ctx)
 	a.mu.Lock()
 	a.cancelFunc = cancel
 	a.messages = append(a.messages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: userMessage,
+		Role:        llm.RoleUser,
+		Content:     userMessage,
+		Attachments: attachments,
 	})
 	a.compressContext(ctx)
 	a.mu.Unlock()
