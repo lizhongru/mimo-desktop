@@ -17,8 +17,10 @@ import (
 	"github.com/mimo-cli/mimo-cli/internal/ignore"
 	"github.com/mimo-cli/mimo-cli/internal/llm"
 	"github.com/mimo-cli/mimo-cli/internal/mcp"
+	"github.com/mimo-cli/mimo-cli/internal/memory"
 	"github.com/mimo-cli/mimo-cli/internal/safety"
 	"github.com/mimo-cli/mimo-cli/internal/session"
+	"github.com/mimo-cli/mimo-cli/internal/task"
 	"github.com/mimo-cli/mimo-cli/internal/tools"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -38,6 +40,7 @@ type App struct {
 	backupMgr     *backup.Manager
 	ignoreMatcher *ignore.Matcher
 	ctxManager    *mctx.Manager
+	memorySvc     *memory.Service // Memory system service
 
 	// State
 	currentSessionID string
@@ -145,6 +148,31 @@ func NewApp() (*App, error) {
 	} else {
 		a.sessionStore = sessionStore
 	}
+
+	// 11. Initialize memory service (lazy init, will be created on first use)
+	// Memory service is initialized lazily in memoryService() method
+	registry.RegisterMemoryTools(a.memoryService)
+	registry.RegisterTaskTools(
+		func() *task.Registry {
+			if a.sessionStore == nil {
+				return nil
+			}
+			return task.NewRegistry(a.sessionStore.DB())
+		},
+		func() string {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			return a.currentSessionID
+		},
+	)
+	registry.RegisterActorTools(
+		getActorRegistry,
+		func() string {
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			return a.currentSessionID
+		},
+	)
 
 	return a, nil
 }

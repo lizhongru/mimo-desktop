@@ -17,6 +17,11 @@ type Store struct {
 	db *sql.DB
 }
 
+// DB returns the underlying database connection
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
 // DefaultWorkspaceID is the permanent "conversations" workspace
 const DefaultWorkspaceID = "default"
 
@@ -173,6 +178,66 @@ func migrate(db *sql.DB) error {
 	// user_name into created_at, making LoadSession fail when scanning time.Time.
 	db.Exec(`UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL OR updated_at = '' OR updated_at NOT GLOB '????-??-??*'`)
 	db.Exec(`UPDATE sessions SET created_at = updated_at WHERE created_at IS NULL OR created_at = '' OR created_at NOT GLOB '????-??-??*'`)
+
+	// --- Migration v4: Memory system tables ---
+	db.Exec(`
+		CREATE TABLE IF NOT EXISTS memory (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			path TEXT NOT NULL,
+			scope TEXT NOT NULL DEFAULT 'project',
+			scope_id TEXT DEFAULT '',
+			type TEXT DEFAULT '',
+			body TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			UNIQUE(path, scope)
+		)
+	`)
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_memory_scope ON memory(scope)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_memory_path ON memory(path)")
+
+	// --- Migration v5: Task system tables ---
+	db.Exec(`
+		CREATE TABLE IF NOT EXISTS tasks (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			parent_task_id TEXT,
+			status TEXT NOT NULL DEFAULT 'open',
+			summary TEXT NOT NULL,
+			owner TEXT,
+			created_at INTEGER NOT NULL,
+			last_event_at INTEGER NOT NULL,
+			ended_at INTEGER,
+			cleanup_after INTEGER,
+			FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+		)
+	`)
+	db.Exec(`
+		CREATE TABLE IF NOT EXISTS task_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			task_id TEXT NOT NULL,
+			at INTEGER NOT NULL,
+			kind TEXT NOT NULL,
+			summary TEXT,
+			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+		)
+	`)
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id)")
+
+	// --- Migration v6: Checkpoint system tables ---
+	db.Exec(`
+		CREATE TABLE IF NOT EXISTS checkpoints (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			summary TEXT NOT NULL DEFAULT '',
+			message_offset INTEGER NOT NULL DEFAULT 0,
+			token_count INTEGER NOT NULL DEFAULT 0,
+			metadata TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+		)
+	`)
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id)")
 
 	return nil
 }
@@ -499,4 +564,107 @@ func (s *Store) CountMessages(sessionID string) (int, error) {
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM messages WHERE session_id = ?", sessionID).Scan(&count)
 	return count, err
+}
+
+// Checkpoint represents a session checkpoint for context reconstruction
+type Checkpoint struct {
+	ID             string    `json:"id"`
+	SessionID      string    `json:"session_id"`
+	Summary        string    `json:"summary"`
+	MessageOffset  int       `json:"message_offset"`
+	TokenCount     int       `json:"token_count"`
+	Metadata       string    `json:"metadata"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// SaveCheckpoint creates or updates a checkpoint
+func (s *Store) SaveCheckpoint(cp *Checkpoint) error {
+	if cp.ID == "" {
+		cp.ID = fmt.Sprintf("cp_%d", time.Now().UnixNano())
+	}
+	_, err := s.db.Exec(`
+		INSERT OR REPLACE INTO checkpoints (id, session_id, summary, message_offset, token_count, metadata, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, cp.ID, cp.SessionID, cp.Summary, cp.MessageOffset, cp.TokenCount, cp.Metadata, cp.CreatedAt)
+	return err
+}
+
+// LoadCheckpoint loads a checkpoint by ID
+func (s *Store) LoadCheckpoint(id string) (*Checkpoint, error) {
+	cp := &Checkpoint{}
+	err := s.db.QueryRow(`
+		SELECT id, session_id, summary, message_offset, token_count, metadata, created_at
+		FROM checkpoints WHERE id = ?
+	`, id).Scan(&cp.ID, &cp.SessionID, &cp.Summary, &cp.MessageOffset, &cp.TokenCount, &cp.Metadata, &cp.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return cp, nil
+}
+
+// ListCheckpoints returns all checkpoints for a session, ordered by created_at DESC
+func (s *Store) ListCheckpoints(sessionID string) ([]Checkpoint, error) {
+	rows, err := s.db.Query(`
+		SELECT id, session_id, summary, message_offset, token_count, metadata, created_at
+		FROM checkpoints WHERE session_id = ? ORDER BY created_at DESC
+	`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var checkpoints []Checkpoint
+	for rows.Next() {
+		var cp Checkpoint
+		if err := rows.Scan(&cp.ID, &cp.SessionID, &cp.Summary, &cp.MessageOffset, &cp.TokenCount, &cp.Metadata, &cp.CreatedAt); err != nil {
+			return nil, err
+		}
+		checkpoints = append(checkpoints, cp)
+	}
+	return checkpoints, rows.Err()
+}
+
+// GetLatestCheckpoint returns the most recent checkpoint for a session
+func (s *Store) GetLatestCheckpoint(sessionID string) (*Checkpoint, error) {
+	cp := &Checkpoint{}
+	err := s.db.QueryRow(`
+		SELECT id, session_id, summary, message_offset, token_count, metadata, created_at
+		FROM checkpoints WHERE session_id = ? ORDER BY created_at DESC LIMIT 1
+	`, sessionID).Scan(&cp.ID, &cp.SessionID, &cp.Summary, &cp.MessageOffset, &cp.TokenCount, &cp.Metadata, &cp.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return cp, nil
+}
+
+// DeleteCheckpoint deletes a checkpoint by ID
+func (s *Store) DeleteCheckpoint(id string) error {
+	_, err := s.db.Exec("DELETE FROM checkpoints WHERE id = ?", id)
+	return err
+}
+
+// LoadMessagesFromOffset loads messages from a specific offset onwards
+func (s *Store) LoadMessagesFromOffset(sessionID string, offset int) ([]Message, error) {
+	rows, err := s.db.Query(`
+		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, created_at
+		FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC
+	`, sessionID, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var msg Message
+		var toolLinesJSON string
+		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.Role, &msg.Content, &msg.Tokens, &msg.ToolCalls, &msg.DurationMs, &msg.Thinking, &toolLinesJSON, &msg.CreatedAt); err != nil {
+			return nil, err
+		}
+		if toolLinesJSON != "" {
+			json.Unmarshal([]byte(toolLinesJSON), &msg.ToolLines)
+		}
+		messages = append(messages, msg)
+	}
+	return messages, rows.Err()
 }
