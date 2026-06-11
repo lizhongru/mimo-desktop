@@ -568,13 +568,13 @@ func (s *Store) CountMessages(sessionID string) (int, error) {
 
 // Checkpoint represents a session checkpoint for context reconstruction
 type Checkpoint struct {
-	ID             string    `json:"id"`
-	SessionID      string    `json:"session_id"`
-	Summary        string    `json:"summary"`
-	MessageOffset  int       `json:"message_offset"`
-	TokenCount     int       `json:"token_count"`
-	Metadata       string    `json:"metadata"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	SessionID     string    `json:"session_id"`
+	Summary       string    `json:"summary"`
+	MessageOffset int       `json:"message_offset"`
+	TokenCount    int       `json:"token_count"`
+	Metadata      string    `json:"metadata"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // SaveCheckpoint creates or updates a checkpoint
@@ -643,11 +643,15 @@ func (s *Store) DeleteCheckpoint(id string) error {
 	return err
 }
 
-// LoadMessagesFromOffset loads messages from a specific offset onwards
+// LoadMessagesFromOffset loads messages after a message-count offset.
 func (s *Store) LoadMessagesFromOffset(sessionID string, offset int) ([]Message, error) {
+	if offset < 0 {
+		offset = 0
+	}
+
 	rows, err := s.db.Query(`
 		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, created_at
-		FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC
+		FROM messages WHERE session_id = ? ORDER BY id ASC LIMIT -1 OFFSET ?
 	`, sessionID, offset)
 	if err != nil {
 		return nil, err

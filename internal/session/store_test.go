@@ -92,6 +92,36 @@ func TestLoadSessionAfterCreateThenSaveReturnsSavedMessages(t *testing.T) {
 	}
 }
 
+func TestLoadMessagesFromOffsetUsesMessagePosition(t *testing.T) {
+	store := newTestStore(t)
+
+	if err := store.CreateSession("session-1", DefaultWorkspaceID, "mimo", "tester"); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	initialMessages := []Message{
+		{Role: "user", Content: "first"},
+		{Role: "assistant", Content: "second"},
+		{Role: "user", Content: "third"},
+	}
+	if err := store.SaveSession("session-1", DefaultWorkspaceID, "mimo", "tester", initialMessages); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := store.SaveSession("session-1", DefaultWorkspaceID, "mimo", "tester", initialMessages); err != nil {
+		t.Fatalf("resave session: %v", err)
+	}
+
+	messages, err := store.LoadMessagesFromOffset("session-1", 1)
+	if err != nil {
+		t.Fatalf("load from offset: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2", len(messages))
+	}
+	if messages[0].Content != "second" || messages[1].Content != "third" {
+		t.Fatalf("messages after offset = %#v", messages)
+	}
+}
+
 func TestMigrateRepairsInvalidSessionCreatedAt(t *testing.T) {
 	store := newTestStore(t)
 

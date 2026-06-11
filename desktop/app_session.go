@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -212,5 +213,11 @@ func (a *App) SaveSessionFromFrontend(sessionID string, messages []ChatMessageDT
 	if err == nil && existingSess != nil {
 		workspaceID = existingSess.WorkspaceID
 	}
-	return a.sessionStore.SaveSession(sessionID, workspaceID, a.cfg.DefaultModel, a.cfg.UserName, msgs)
+	if err := a.sessionStore.SaveSession(sessionID, workspaceID, a.cfg.DefaultModel, a.cfg.UserName, msgs); err != nil {
+		return err
+	}
+	if err := a.maybeCreateAutoCheckpoint(sessionID); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to create auto checkpoint: %v\n", err)
+	}
+	return nil
 }

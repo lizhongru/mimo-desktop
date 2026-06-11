@@ -1,10 +1,12 @@
 package desktop
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mimo-cli/mimo-cli/internal/context"
@@ -31,33 +33,38 @@ type CheckpointInfo struct {
 // CreateCheckpoint creates a checkpoint for the current session
 func (a *App) CreateCheckpoint(summary string) CheckpointResult {
 	a.mu.Lock()
-	defer a.mu.Unlock()
+	sessionID := a.currentSessionID
+	a.mu.Unlock()
 
-	if a.currentSessionID == "" {
+	if sessionID == "" {
 		return CheckpointResult{Success: false, Message: "No active session"}
 	}
+	return a.createCheckpointForSession(sessionID, summary, "manual")
+}
 
+func (a *App) createCheckpointForSession(sessionID string, summary string, source string) CheckpointResult {
 	if a.sessionStore == nil {
 		return CheckpointResult{Success: false, Message: "Session store not initialized"}
 	}
 
-	// Get current message count
-	msgCount, err := a.sessionStore.CountMessages(a.currentSessionID)
+	_, messages, err := a.sessionStore.LoadSession(sessionID)
 	if err != nil {
-		return CheckpointResult{Success: false, Message: fmt.Sprintf("Failed to count messages: %v", err)}
+		return CheckpointResult{Success: false, Message: fmt.Sprintf("Failed to load session messages: %v", err)}
 	}
 
-	// Estimate token count from messages
-	tokenCount := msgCount * 50 // rough estimate
+	messageOffset := len(messages)
+	tokenCount := estimateCheckpointTokens(messages)
+	if strings.TrimSpace(summary) == "" {
+		summary = buildAutoCheckpointSummary(messages)
+	}
 
-	// Create checkpoint
 	cp := &session.Checkpoint{
 		ID:            fmt.Sprintf("cp_%d", time.Now().UnixNano()),
-		SessionID:     a.currentSessionID,
+		SessionID:     sessionID,
 		Summary:       summary,
-		MessageOffset: msgCount,
+		MessageOffset: messageOffset,
 		TokenCount:    tokenCount,
-		Metadata:      "{}",
+		Metadata:      fmt.Sprintf(`{"source":%q}`, source),
 		CreatedAt:     time.Now(),
 	}
 
@@ -71,10 +78,11 @@ func (a *App) CreateCheckpoint(summary string) CheckpointResult {
 		context.DefaultCheckpointConfig(),
 		wd,
 	)
-	sessionDir := filepath.Join(wd, ".mimo", "memory", "sessions", a.currentSessionID)
+	sessionDir := filepath.Join(wd, ".mimo", "memory", "sessions", sessionID)
 
 	state := &context.CheckpointState{
-		SessionID:  a.currentSessionID,
+		SessionID:  sessionID,
+		Messages:   checkpointMessageSnapshots(messages),
 		Summary:    summary,
 		TokenCount: tokenCount,
 		CreatedAt:  time.Now(),
@@ -90,6 +98,115 @@ func (a *App) CreateCheckpoint(summary string) CheckpointResult {
 		Message: "Checkpoint created successfully",
 		ID:      cp.ID,
 	}
+}
+
+func (a *App) maybeCreateAutoCheckpoint(sessionID string) error {
+	if sessionID == "" || a.sessionStore == nil {
+		return nil
+	}
+
+	checkpointCfg := context.DefaultCheckpointConfig()
+	maxTokens := checkpointCfg.ContextBudget
+	if a.cfg != nil && a.cfg.Context.MaxTokens > 0 {
+		maxTokens = a.cfg.Context.MaxTokens
+		checkpointCfg.ContextBudget = maxTokens
+	}
+
+	_, messages, err := a.sessionStore.LoadSession(sessionID)
+	if err != nil {
+		return err
+	}
+	if len(messages) == 0 {
+		return nil
+	}
+
+	currentTokens := estimateCheckpointTokens(messages)
+	checkpointMgr := context.NewCheckpointManager(checkpointCfg, "")
+	if !checkpointMgr.ShouldCheckpoint(currentTokens, maxTokens) {
+		return nil
+	}
+
+	latest, err := a.sessionStore.GetLatestCheckpoint(sessionID)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if latest != nil && latest.MessageOffset >= len(messages) {
+		return nil
+	}
+
+	result := a.createCheckpointForSession(sessionID, buildAutoCheckpointSummary(messages), "auto")
+	if !result.Success {
+		return fmt.Errorf("%s", result.Message)
+	}
+
+	return a.pruneCheckpoints(sessionID, checkpointCfg.MaxCheckpoints)
+}
+
+func (a *App) pruneCheckpoints(sessionID string, maxCheckpoints int) error {
+	if maxCheckpoints <= 0 || a.sessionStore == nil {
+		return nil
+	}
+	checkpoints, err := a.sessionStore.ListCheckpoints(sessionID)
+	if err != nil {
+		return err
+	}
+	for i := maxCheckpoints; i < len(checkpoints); i++ {
+		if err := a.sessionStore.DeleteCheckpoint(checkpoints[i].ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func estimateCheckpointTokens(messages []session.Message) int {
+	total := 0
+	for _, msg := range messages {
+		if msg.Tokens > 0 {
+			total += msg.Tokens
+		} else {
+			total += len(msg.Content) / 3
+		}
+		total += msg.ToolCalls * 10
+		for _, line := range msg.ToolLines {
+			total += len(line) / 3
+		}
+		total += 10
+	}
+	return total
+}
+
+func buildAutoCheckpointSummary(messages []session.Message) string {
+	latestUserMessage := ""
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			latestUserMessage = truncateCheckpointText(messages[i].Content, 160)
+			break
+		}
+	}
+	if latestUserMessage == "" {
+		return fmt.Sprintf("自动检查点：已保存 %d 条消息。", len(messages))
+	}
+	return fmt.Sprintf("自动检查点：已保存 %d 条消息。最近用户消息：%s", len(messages), latestUserMessage)
+}
+
+func checkpointMessageSnapshots(messages []session.Message) []context.MessageSnapshot {
+	snapshots := make([]context.MessageSnapshot, 0, len(messages))
+	for _, msg := range messages {
+		snapshots = append(snapshots, context.MessageSnapshot{
+			Role:      msg.Role,
+			Content:   msg.Content,
+			ToolCalls: msg.ToolLines,
+		})
+	}
+	return snapshots
+}
+
+func truncateCheckpointText(text string, maxLen int) string {
+	runes := []rune(text)
+	if len(runes) <= maxLen {
+		return text
+	}
+	return string(runes[:maxLen]) + "..."
 }
 
 // ListCheckpoints returns all checkpoints for the current session
