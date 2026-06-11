@@ -3,19 +3,51 @@
 import {desktop} from '../models';
 import {llm} from '../models';
 
+export function ActorCancel(arg1:string):Promise<desktop.ActorResult>;
+
+export function ActorCleanup(arg1:number):Promise<number>;
+
+export function ActorGet(arg1:string):Promise<desktop.ActorInfo>;
+
+export function ActorList(arg1:string):Promise<Array<desktop.ActorInfo>>;
+
+export function ActorSpawn(arg1:string,arg2:string,arg3:string):Promise<desktop.ActorResult>;
+
 export function AddModel(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>,arg8:string,arg9:number,arg10:number,arg11:number,arg12:boolean,arg13:boolean,arg14:boolean):Promise<void>;
+
+export function AgentGetCurrent():Promise<desktop.AgentConfigInfo>;
+
+export function AgentListConfigs():Promise<Array<desktop.AgentConfigInfo>>;
+
+export function AgentSwitch(arg1:string):Promise<desktop.AgentSwitchResult>;
+
+export function AgentUpdateConfig(arg1:string,arg2:desktop.AgentConfigInfo):Promise<desktop.AgentSwitchResult>;
 
 export function CancelOperation():Promise<void>;
 
 export function CompressContext():Promise<Record<string, number>>;
 
+export function CreateCheckpoint(arg1:string):Promise<desktop.CheckpointResult>;
+
 export function CreateNewSession(arg1:string):Promise<string>;
 
 export function CreateWorkspace(arg1:string):Promise<desktop.WorkspaceDTO>;
 
+export function DeleteCheckpoint(arg1:string):Promise<desktop.CheckpointResult>;
+
 export function DeleteSession(arg1:string):Promise<void>;
 
+export function DistillListCandidates():Promise<Array<desktop.SkillCandidateInfo>>;
+
+export function DistillRun():Promise<desktop.DreamResult>;
+
+export function DreamRun():Promise<desktop.DreamResult>;
+
 export function ExportChat(arg1:Array<desktop.ExportMessage>):Promise<void>;
+
+export function ExportCheckpoints():Promise<string>;
+
+export function GetCheckpointSummary(arg1:string):Promise<string>;
 
 export function GetConfig():Promise<desktop.AppConfigDTO>;
 
@@ -31,6 +63,10 @@ export function GetWorkingDir():Promise<string>;
 
 export function IsBusy():Promise<boolean>;
 
+export function ListCheckpoints():Promise<Array<desktop.CheckpointInfo>>;
+
+export function ListMemoryFiles():Promise<Array<desktop.MemoryFileInfo>>;
+
 export function ListRemoteModels(arg1:string):Promise<Array<llm.ModelInfo>>;
 
 export function ListRemoteModelsWithConfig(arg1:string,arg2:string):Promise<Array<llm.ModelInfo>>;
@@ -41,9 +77,19 @@ export function ListWorkspaces():Promise<Array<desktop.WorkspaceDTO>>;
 
 export function LoadSession(arg1:string):Promise<desktop.SessionData>;
 
+export function MemoryCount():Promise<number>;
+
+export function MemoryIndexFile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function MemoryReconcile():Promise<number|number>;
+
+export function MemorySearch(arg1:string,arg2:string,arg3:number):Promise<Array<desktop.MemorySearchResult>>;
+
 export function MoveSession(arg1:string,arg2:string):Promise<void>;
 
 export function OpenInExplorer(arg1:string):Promise<void>;
+
+export function ReadMemory(arg1:string):Promise<string>;
 
 export function RemoveModel(arg1:string):Promise<void>;
 
@@ -52,6 +98,8 @@ export function RenameSession(arg1:string,arg2:string):Promise<void>;
 export function RespondToConfirm(arg1:boolean):Promise<void>;
 
 export function RespondToConfirmAll(arg1:boolean):Promise<void>;
+
+export function RestoreCheckpoint(arg1:string):Promise<desktop.CheckpointResult>;
 
 export function SaveSessionFromFrontend(arg1:string,arg2:Array<desktop.ChatMessageDTO>):Promise<void>;
 
@@ -73,6 +121,20 @@ export function SetSafetyLevel(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function TaskBlock(arg1:string,arg2:string):Promise<desktop.TaskResult>;
+
+export function TaskCreate(arg1:string,arg2:string):Promise<desktop.TaskResult>;
+
+export function TaskDelete(arg1:string):Promise<desktop.TaskResult>;
+
+export function TaskDone(arg1:string,arg2:string):Promise<desktop.TaskResult>;
+
+export function TaskGetEvents(arg1:string):Promise<Array<desktop.TaskEventInfo>>;
+
+export function TaskList(arg1:string,arg2:boolean):Promise<Array<desktop.TaskInfo>>;
+
+export function TaskStart(arg1:string,arg2:string,arg3:string):Promise<desktop.TaskResult>;
+
 export function UpdateModel(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>,arg8:string,arg9:number,arg10:number,arg11:number,arg12:boolean,arg13:boolean,arg14:boolean):Promise<void>;
 
 export function WindowClose():Promise<void>;
@@ -82,3 +144,5 @@ export function WindowIsMaximised():Promise<boolean>;
 export function WindowMaximise():Promise<void>;
 
 export function WindowMinimise():Promise<void>;
+
+export function WriteMemory(arg1:string,arg2:string):Promise<void>;

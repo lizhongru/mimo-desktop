@@ -4,6 +4,10 @@ type TranslationKey =
   | "settings"
   | "tools_mcp"
   | "tools"
+  | "memory"
+  | "checkpoint"
+  | "task"
+  | "actor"
   | "language"
   | "theme"
   | "font_size"
@@ -229,6 +233,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     settings: "设置",
     tools_mcp: "工具 & MCP",
     tools: "工具",
+    memory: "记忆",
+    checkpoint: "检查点",
+    task: "任务",
+    actor: "子智能体",
     language: "语言",
     theme: "主题",
     font_size: "字体大小",
@@ -453,6 +461,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     settings: "Settings",
     tools_mcp: "Tools & MCP",
     tools: "Tools",
+    memory: "Memory",
+    checkpoint: "Checkpoint",
+    task: "Tasks",
+    actor: "Actors",
     language: "Language",
     theme: "Theme",
     font_size: "Font Size",

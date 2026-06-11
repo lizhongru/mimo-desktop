@@ -1,132 +1,261 @@
-﻿# MiMo Desktop — 上下文交接文档
+# MiMo Desktop — 当前上下文交接
 
-> 日期：2026-06-10
-> 版本：v0.6.0-dev（未提交，基于 eae742e）
-> 技术栈：Wails v2 + Go 1.26 + React 19 + TypeScript + Zustand + Tailwind CSS
-> 验证状态：npx tsc --noEmit 零错误 | go vet -tags wails 零错误
-> Git 远程：origin -> https://github.com/lizhongru/mimo-desktop.git（未 push）
-> 未提交变更：18 个文件，+296/-164 行
+> 日期：2026-06-11
+> 工作区：`D:\works\study\mimo cli`
+> 状态：未提交；仓库里有大量历史 dirty 变更，下一位 agent 不要随手 reset/revert。
 
 ---
 
-## 一、本次完成的工作（v0.6.0）
+## 1. 当前任务背景
 
-### 1.1 文件上传后端对接（全链路打通）
-- internal/llm/message.go — 新增 Attachment 结构体和 Message.Attachments 字段
-- internal/llm/openai.go — openAIMessage.Content 改为 json.RawMessage；新增 uildOpenAIContent() 将附件转为 OpenAI 多模态 content 数组（图片→image_url，文件→文本描述）；response 解析兼容 content 数组
-- internal/agent/agent.go — Chat() 和 ChatStream() 签名新增 ttachments []llm.Attachment 参数
-- desktop/app_chat.go — SendMessage() 新增 ttachmentsJSON string 参数，JSON 反序列化后传给 Agent
-- 前端 ChatInput / WelcomeView / AppLayout / App.tsx — onSend 类型统一改为 (message, attachments?) 签名，附件 JSON 序列化后传给 Wails
+用户最初在排查「会话按工作区/项目分区」相关 bug。
 
-### 1.2 拖拽上传优化
-- **去掉全屏 overlay** — AppLayout 的全屏拖拽 overlay（dragenter/leave 计数器）在 WebView2 复杂子元素下不稳定，彻底移除
-- **输入框区域拖拽** — ChatInput / WelcomeView 各自的输入框区域独立处理拖拽，用 ref 计数器精确控制
-- **拖拽高亮** — 拖入时输入框 accent 边框 + 微光 + "松手即可添加"提示
-- **自定义光标** — globals.css 新增 .drag-active（暗色文件图标）和 .drag-drop-zone（accent 色文件图标），用 SVG data URI
-- **外层拦截** — AppLayout 外层 div 加 onDragOver={preventDefault} + onDrop={preventDefault}，阻止 WebView2 默认打开文件行为
-- **子组件去掉 stopPropagation** — ChatInput / WelcomeView 的 handleDrop / handleDragOver 不再 stopPropagation，让事件正常冒泡
+已经确认过的一轮用户测试结果：
 
-### 1.3 ModelReasoningPicker 重新设计
-- **主面板（点击触发）**：推理级别 segmented control（⚡低/⚖️中/🧠高）+ 当前模型行
-- **模型列表（点击展开）**：点击当前模型行 → 模型列表从左侧滑出，只显示显示名，不显示 key
-- **hover 改 click**：hover 展开在 WebView2 中不可靠，改为点击切换
-- **挂载时刷新**：useEffect(() => refreshModels(), []) 确保拿到最新模型列表
-- ChatInput + WelcomeView 两处同步
+1. 不关联项目时，对话进入 `DEFAULT`。
+2. 创建 A 项目后，对话进入 A 项目。
+3. 创建 B 项目后，对话进入 B 项目。
 
-### 1.4 设置页模型管理同步
-- settingsStore.ts 新增 efreshModels() — 从后端 GetConfig 重新拉取模型列表，更新 models、_modelsMap、currentModel/currentModelKey
-- SettingsPage.tsx — 在 onAdd / onUpdate / onRemove / onSetDefault 4 个操作成功后都调用 efreshModels()
+这说明「新建会话归属分区」主逻辑已经基本正常。
 
-### 1.5 侧栏会话分组
-- 三组分组：**当前工作区** / **"对话"（无工作区）** / **其他工作区**
-- sessionsWithWorkspace Set 标记：用户主动选了工作区的 session id 才归入工作区组
-- 新建对话时清除 selectedWorkspace，确保新对话在"对话"组
-- 三组都可以独立展开/收起
+之后用户又反馈过这些问题：
 
-### 1.6 UserProfileFooter 改造
-- 去掉工作区路径显示，改为 MiMo User 占位 + "点击打开设置"
-- 去掉 workingDir 参数依赖，为后续用户登录留位置
-
-### 1.7 外层拖拽光标
-- 拖拽到非输入框区域时 drag-active CSS 类覆盖光标为暗色文件图标（不显示"复制"）
-- 输入框区域用 drag-drop-zone 显示 accent 色文件图标
+- 点击项目/DEFAULT 中的对话，无法查看详情继续对话。
+- 点击项目 A 展开时，项目 B 也同时展开。
+- 希望 `DEFAULT` 放在项目下方，并改为中文显示。
+- 选择工作区后，让模型查看当前工作区内容时，读取的文件夹路径不对。
+- 最新需求：欢迎页模型选择器和聊天页不一致，需要统一；聊天页需要支持手动选择文件上传或选择文件夹。
 
 ---
 
-## 二、变更文件清单
+## 2. 最新已完成工作
 
-| 文件 | 变更内容 |
-|------|----------|
-| internal/llm/message.go | +Attachment 类型，Message.Attachments 字段 |
-| internal/llm/openai.go | Content→json.RawMessage，buildOpenAIContent()，response 解析兼容 |
-| internal/agent/agent.go | Chat/ChatStream 签名加 attachments |
-| desktop/app_chat.go | SendMessage 加 attachmentsJSON 参数 |
-| desktop/app_session.go | SaveSessionFromFrontend 加 workingDir 参数 |
-| desktop/frontend/src/App.tsx | SendMessage 声明更新，handleSend 传附件，handleSelectWorkspace 标记 session，handleNewChat 清除 selectedWorkspace |
-| desktop/frontend/src/components/chat/ChatInput.tsx | ModelReasoningPicker 重写（click 展开），onSend 传附件，输入框拖拽高亮 |
-| desktop/frontend/src/components/layout/AppLayout.tsx | 去掉全屏拖拽 overlay，外层 preventDefault + 自定义光标类 |
-| desktop/frontend/src/components/layout/LeftSidebar.tsx | 三组分组 + sessionsWithWorkspace，UserProfileFooter 改用户信息占位 |
-| desktop/frontend/src/components/settings/SettingsPage.tsx | onAdd/onUpdate/onRemove/onSetDefault 后调 refreshModels |
-| desktop/frontend/src/components/welcome/WelcomeView.tsx | ModelReasoningPicker 同步，onSend 传附件，输入框拖拽高亮 |
-| desktop/frontend/src/hooks/useAgent.ts | SaveSessionFromFrontend 传 selectedWorkspace |
-| desktop/frontend/src/lib/i18n.ts | +search_models, no_models_found, back, conversations, click_to_settings |
-| desktop/frontend/src/stores/sessionStore.ts | +selectedWorkspace, sessionsWithWorkspace, markSessionHasWorkspace |
-| desktop/frontend/src/stores/settingsStore.ts | +refreshModels() |
-| desktop/frontend/src/styles/globals.css | +drag-active, drag-drop-zone 自定义光标 |
-| desktop/frontend/src/wails/wailsjs/go/desktop/App.d.ts | 类型声明同步 |
-| desktop/frontend/src/wails/wailsjs/go/desktop/App.js | JS 绑定同步 |
+### 2.1 欢迎页/聊天页模型选择器统一
+
+新增共享组件：
+
+- `desktop/frontend/src/components/chat/ModelReasoningPicker.tsx`
+
+当前 `WelcomeView` 和 `ChatInput` 都使用这个共享组件，模型选择和推理强度切换行为一致。
+
+### 2.2 前端文件/文件夹附件能力
+
+新增附件工具：
+
+- `desktop/frontend/src/lib/attachments.ts`
+
+修改：
+
+- `desktop/frontend/src/components/chat/ChatInput.tsx`
+- `desktop/frontend/src/components/welcome/WelcomeView.tsx`
+
+当前能力：
+
+- 聊天页支持手动选择文件。
+- 聊天页支持选择文件夹。
+- 欢迎页也保持相同入口。
+- 文件夹选择通过 `webkitdirectory/directory`。
+- 文件夹内文件会保留 `webkitRelativePath` 相对路径。
+- 普通文件选择不再限制扩展名，代码文件也能直接选。
+- 附件在输入框上方以 chip 形式展示，可移除。
+- 文件/文件夹按钮增加了 `aria-label`。
+
+### 2.3 i18n 文案补齐
+
+修改：
+
+- `desktop/frontend/src/lib/i18n.ts`
+
+新增/修正：
+
+- `attach_file`: 中文为「添加文件」
+- `attach_folder`: 中文为「添加文件夹」
+- 还补了部分之前工作区/侧栏相关文案 key。
+
+### 2.4 后端附件内容链路补强
+
+修改：
+
+- `internal/llm/openai.go`
+- `internal/llm/anthropic.go`
+
+新增测试：
+
+- `internal/llm/openai_test.go`
+- `internal/llm/anthropic_test.go`
+
+当前能力：
+
+- OpenAI-compatible 路径：
+  - 图片附件转为 `image_url`。
+  - 文本/代码类附件会从 `dataUrl` 解码，把真实文件内容放入模型输入。
+  - 非文本/非图片文件只给模型文件名和 MIME 类型提示。
+- Anthropic-compatible 路径：
+  - 图片附件转为 Anthropic image/source block。
+  - 文本/代码类附件同样会解码并放入 text block。
+- 文本附件内容有最大截断：`200000` 字符，避免超大文件直接打爆上下文。
+
+### 2.5 Wails 绑定/前后端签名
+
+已有链路：
+
+- `desktop/frontend/src/App.tsx`
+  - `handleSend(message, attachments?)`
+  - 附件序列化为 JSON 后传给 `SendMessage`
+- `desktop/app_chat.go`
+  - `SendMessage(message, attachmentsJSON)`
+  - 解析 JSON 后传给 Agent
+- `internal/agent/agent.go`
+  - `Chat/ChatStream` 已接收 `[]llm.Attachment`
+- `internal/llm/message.go`
+  - `Message.Attachments`
+  - `Attachment{Name, Type, DataURL}`
 
 ---
 
-## 三、当前已知问题
+## 3. 已验证
 
-### 3.1 未测试功能
-- **文件上传实际发送**：附件数据已能传到后端 Agent，但未实际测试 LLM 多模态请求是否正确（需要支持 vision 的模型）
-- **Agent 工具闭环**：桌面端实际运行验证未完成
-- **MCP 工具调用**：未测试
-- **拖拽上传实际效果**：自定义光标 SVG 在不同 DPI 下可能需要调整
+最后一轮验证已通过：
 
-### 3.2 潜在风险
-- **_modelsMap 用 s any 存储**：不在 Zustand 接口定义中，依赖 getState() 读取，Zustand 订阅机制不覆盖此字段
-- **CRLF 行尾问题**：Windows 环境下 Go 文件和 TS 文件行尾不一致，导致 String.Replace 经常静默失败，后续修改文件建议用行操作或 [System.IO.File]::ReadAllText + 确认替换结果
-- **selectedWorkspace 没持久化**：刷新页面后丢失，session 重新归组可能不一致（但 ListSessions 拉取后 sessionsWithWorkspace 也丢失）
-- **sessionsWithWorkspace 没持久化**：同上，页面刷新后 Set 为空，所有 session 会被归入"对话"组（除了有后端 workingDir 的）
-- **UserProfileFooter 的 MiMo User 是硬编码**：后续需要接入真实用户数据
-- **ModelReasoningPicker modelsMap 一次性读取**：用 getState() 而非订阅，如果 store 异步更新了 _modelsMap，组件不会自动重渲染（但 models 数组的订阅会触发重渲染，间接刷新）
-
-### 3.3 代码质量问题
-- **WelcomeView 和 ChatInput 各有一份 ModelReasoningPicker 副本**：应提取为共享组件
-- **WelcomeView 和 ChatInput 各有一份 MiniDropdown / Dropdown 副本**：同上
-- **globals.css 里 	("conversations") 在 getDirName 中调用**：getDirName 是纯函数但依赖 i18n，如果语言切换时组件没重渲染，显示可能不一致
-
----
-
-## 四、下一步建议
-
-### 高优先级
-1. **持久化 sessionsWithWorkspace**：存入 localStorage 或后端，避免刷新后分组丢失
-2. **Agent 工具闭环验证**：发送需要工具调用的消息验证端到端
-3. **文件上传实际测试**：用支持 vision 的模型测试图片上传
-
-### 中优先级
-4. **提取共享组件**：ModelReasoningPicker、Dropdown、MiniDropdown 提取为独立组件
-5. **MCP 工具测试**
-6. **代码分割**：设置页/工具面板懒加载
-7. **React ErrorBoundary**
-8. **MarkdownRenderer 代码块复制按钮**
-
-### 低优先级
-9. **上下文压缩中间进度**
-10. **ToolCallCard 结果语法高亮**
-11. **用户登录/信息存储**
-
----
-
-## 五、环境与启动
+```powershell
+cd "D:\works\study\mimo cli\desktop\frontend"
+npx tsc --noEmit
+npm run build
+```
 
 ```powershell
 cd "D:\works\study\mimo cli"
-wails dev -tags wails          # 开发模式（需重启加载 Go 变更）
-cd desktop/frontend && npx tsc --noEmit  # TS 检查
-go vet -tags wails ./...       # Go 检查
+go test ./internal/llm ./internal/agent ./desktop
+git diff --check
+```
+
+结果：
+
+- TypeScript 类型检查通过。
+- Vite 生产构建通过。
+- 相关 Go 测试通过。
+- `git diff --check` 通过。
+- `npm run build` 仍有既有的大 chunk warning 和 Node ESM warning，不是阻断错误。
+
+浏览器 DOM 验证也做过，目标：`http://127.0.0.1:5173/`
+
+确认：
+
+- 欢迎页存在「添加文件」「添加文件夹」「当前模型」。
+- 文件 input 不再有 `accept` 限制。
+- 文件夹 input 有 `webkitdirectory` 和 `directory`。
+- 模型选择面板能打开，能看到低/中/高推理。
+
+注意：浏览器验证是 Vite 前端 DOM 验证，完整 Wails Go bridge 行为仍需要桌面应用里测。
+
+---
+
+## 4. 下一步建议
+
+优先让用户在桌面 Wails 应用里实测：
+
+1. 欢迎页模型选择器是否和聊天页一致。
+2. 欢迎页切换模型后，进入聊天页是否保持同一模型。
+3. 聊天页手动选择单个文件、多个文件是否能正常作为附件发送。
+4. 聊天页选择文件夹后，模型是否能看到文件夹内文本/代码文件内容和相对路径。
+5. 上传 `.md/.txt/.json/.ts/.go` 等文本/代码文件，让模型复述内容，确认不是只看到文件名。
+6. 上传图片，确认支持 vision 的模型能看到图片。
+7. 切换不同模型供应商，确认 OpenAI-compatible / Anthropic-compatible 的附件行为一致。
+8. 回归工作区路径 bug：选择工作区后，让模型查看当前工作区文件，确认读取的是用户选择的目录。
+
+如果用户测试失败，优先检查：
+
+- `desktop/app_chat.go` 是否把当前 session 的 working dir 写入 context。
+- `internal/tools/workdir.go` 和各工具是否从 context 读取工作目录。
+- `App.tsx` 的 `selectedWorkspace` / `currentSessionId` 是否在发送前正确绑定。
+- 左侧栏加载 session 后是否恢复 `workspaceId` 和消息。
+
+---
+
+## 5. 潜在问题/风险
+
+### 5.1 仓库状态
+
+- 当前工作区有很多历史未提交/未跟踪文件。
+- 不要使用 `git reset --hard`、`git checkout --` 之类命令。
+- 不要 revert 与当前任务无关的文件。
+
+### 5.2 文件上传限制
+
+- 文本/代码文件会解码进入上下文。
+- 图片会作为图片附件传给模型。
+- PDF、压缩包、Office 文档等二进制文件目前不会解析内容，只会传文件名和类型提示。
+- 文件夹如果很大，前端会把选中的文件都读成 data URL，可能导致内存和请求体很大；后续可以加数量/大小限制和提示。
+
+### 5.3 UI/UX
+
+- 文件/文件夹按钮目前是 icon-only + title/aria-label。
+- 上传后的消息列表目前不一定会把附件显示在已发送消息气泡里，主要是在发送前展示 chip。
+- 如果用户期望「只上传附件不输入文字也能发送」，当前发送按钮仍主要依赖文本输入，需要再改。
+
+### 5.4 模型选择器
+
+- `ModelReasoningPicker` 依赖 `settingsStore.refreshModels()` 拉取模型。
+- `_modelsMap` 仍是 Zustand store 里的非接口字段，用 `as any` 读取；可工作，但类型上不够干净。
+
+### 5.5 Wails/Vite 验证差异
+
+- Vite 浏览器里没有真实 `window.go`，只能做前端 DOM/交互结构验证。
+- 真正的 session 创建、消息发送、工作区绑定、工具读目录，必须在 Wails 桌面应用里测试。
+
+---
+
+## 6. 关键文件清单
+
+前端：
+
+- `desktop/frontend/src/components/chat/ModelReasoningPicker.tsx`
+- `desktop/frontend/src/lib/attachments.ts`
+- `desktop/frontend/src/components/chat/ChatInput.tsx`
+- `desktop/frontend/src/components/welcome/WelcomeView.tsx`
+- `desktop/frontend/src/App.tsx`
+- `desktop/frontend/src/components/layout/AppLayout.tsx`
+- `desktop/frontend/src/components/layout/LeftSidebar.tsx`
+- `desktop/frontend/src/stores/sessionStore.ts`
+- `desktop/frontend/src/stores/settingsStore.ts`
+- `desktop/frontend/src/lib/i18n.ts`
+
+后端：
+
+- `desktop/app_chat.go`
+- `desktop/app_session.go`
+- `internal/agent/agent.go`
+- `internal/llm/message.go`
+- `internal/llm/openai.go`
+- `internal/llm/anthropic.go`
+- `internal/tools/workdir.go`
+- `internal/tools/*`
+
+测试：
+
+- `internal/llm/openai_test.go`
+- `internal/llm/anthropic_test.go`
+- `internal/session/store_test.go`
+- `internal/session/workspace_test.go`
+- `internal/tools/workdir_test.go`
+
+---
+
+## 7. 启动/检查命令
+
+```powershell
+cd "D:\works\study\mimo cli"
+wails dev -tags wails
+```
+
+```powershell
+cd "D:\works\study\mimo cli\desktop\frontend"
+npx tsc --noEmit
+npm run build
+```
+
+```powershell
+cd "D:\works\study\mimo cli"
+go test ./internal/llm ./internal/agent ./desktop
+git diff --check
 ```

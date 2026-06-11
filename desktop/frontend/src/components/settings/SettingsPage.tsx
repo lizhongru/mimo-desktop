@@ -22,8 +22,9 @@ import {
 import { t, td } from "../../lib/i18n";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { ModelManager, type ModelConfig } from "./ModelManager";
+import { AdvancedSettings } from "./AdvancedSettings";
 
-type Tab = "general" | "tools" | "models" | "help";
+type Tab = "general" | "advanced" | "tools" | "models" | "help";
 
 interface ToolInfo {
   name: string;
@@ -144,6 +145,7 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
 
   const tabs: { id: Tab; icon: typeof SettingsIcon; label: string }[] = [
     { id: "general", icon: SettingsIcon, label: t("general") },
+    { id: "advanced", icon: SettingsIcon, label: "高级设置" },
     { id: "tools", icon: Wrench, label: t("tools_mcp") },
     { id: "models", icon: Cpu, label: t("models") },
     { id: "help", icon: HelpCircle, label: t("help_feedback") },
@@ -289,6 +291,15 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Advanced Settings */}
+            {tab === "advanced" && (
+              <AdvancedSettings
+                onSave={(config) => {
+                  console.log("Advanced settings saved:", config);
+                }}
+              />
             )}
 
             {/* Tools & MCP */}

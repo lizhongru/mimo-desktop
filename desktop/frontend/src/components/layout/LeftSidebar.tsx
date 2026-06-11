@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Plus,
   MessageSquare,
@@ -21,6 +21,10 @@ import {
   Languages,
   Moon,
   Sun,
+  Database,
+  History,
+  ListTodo,
+  Bot
 } from "lucide-react";
 import { useSessionStore, type SessionItem, type WorkspaceItem } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -36,6 +40,10 @@ interface Props {
   onDeleteSession: (id: string) => void;
   onExportSession?: (id: string) => Promise<void>;
   onOpenSettings: () => void;
+  onOpenMemory: () => void;
+  onOpenCheckpoint: () => void;
+  onOpenTask: () => void;
+  onOpenActor: () => void;
 }
 
 interface ContextMenuState {
@@ -131,11 +139,10 @@ function ContextMenu({
             item.onClick();
             onClose();
           }}
-          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors cursor-pointer ${
-            item.danger
+          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors cursor-pointer ${item.danger
               ? "text-red-400 hover:bg-red-500/10"
               : "text-txt-2 hover:bg-elevated"
-          }`}
+            }`}
         >
           <item.icon className="w-3.5 h-3.5" />
           {item.label}
@@ -166,11 +173,10 @@ function SessionItemRow({
 }) {
   return (
     <div
-      className={`group flex items-start gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors ${
-        isActive && !isManageMode
+      className={`group flex items-start gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors ${isActive && !isManageMode
           ? "bg-accent/10 border-l-2 border-accent"
           : "border-l-2 border-transparent hover:bg-elevated/40"
-      } ${isSelected ? "bg-accent/10" : ""}`}
+        } ${isSelected ? "bg-accent/10" : ""}`}
       onClick={(e) => {
         e.stopPropagation();
         if (isManageMode) {
@@ -220,6 +226,10 @@ export function LeftSidebar({
   onLoadSession,
   onDeleteSession,
   onOpenSettings,
+  onOpenMemory,
+  onOpenCheckpoint,
+  onOpenTask,
+  onOpenActor,
 }: Props) {
   const sessions = useSessionStore((s) => s.sessions);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
@@ -244,7 +254,7 @@ export function LeftSidebar({
   const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
-  // Workspaces are loaded in App.tsx on mount
+    // Workspaces are loaded in App.tsx on mount
 
 
 
@@ -397,9 +407,8 @@ export function LeftSidebar({
         <button
           onClick={onToggle}
           onContextMenu={(e) => handleWorkspaceContextMenu(e, wsId)}
-          className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider w-full transition-colors cursor-pointer ${
-            isPinned ? "text-accent" : "text-txt-m hover:text-txt-g"
-          }`}
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider w-full transition-colors cursor-pointer ${isPinned ? "text-accent" : "text-txt-m hover:text-txt-g"
+            }`}
         >
           <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "" : "-rotate-90"}`} />
           <GroupIcon className="w-3 h-3" />
@@ -457,9 +466,8 @@ export function LeftSidebar({
                 setManageMode(true);
               }
             }}
-            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-              manageMode ? "bg-accent/20 text-accent" : "bg-elevated text-txt-g hover:text-txt"
-            }`}
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${manageMode ? "bg-accent/20 text-accent" : "bg-elevated text-txt-g hover:text-txt"
+              }`}
             title={t("manage")}
           >
             {manageMode ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
@@ -499,7 +507,13 @@ export function LeftSidebar({
       </div>
 
       {/* Footer ? User profile menu */}
-      <UserProfileFooter onOpenSettings={onOpenSettings} />
+      <UserProfileFooter
+        onOpenSettings={onOpenSettings}
+        onOpenMemory={onOpenMemory}
+        onOpenCheckpoint={onOpenCheckpoint}
+        onOpenTask={onOpenTask}
+        onOpenActor={onOpenActor}
+      />
 
       {/* Context Menu */}
       {contextMenu && (
@@ -594,188 +608,231 @@ export function LeftSidebar({
   );
 
 
-function UserProfileFooter({
-  onOpenSettings,
-}: {
-  onOpenSettings: () => void;
-}) {
-  const language = useSettingsStore((s) => s.language);
-  const theme = useSettingsStore((s) => s.theme);
-  const setLanguage = useSettingsStore((s) => s.setLanguage);
-  const setTheme = useSettingsStore((s) => s.setTheme);
+  function UserProfileFooter({
+    onOpenSettings,
+    onOpenMemory,
+    onOpenCheckpoint,
+    onOpenTask,
+    onOpenActor,
+  }: {
+    onOpenSettings: () => void;
+    onOpenMemory: () => void;
+    onOpenCheckpoint: () => void;
+    onOpenTask: () => void;
+    onOpenActor: () => void;
+  }) {
+    const language = useSettingsStore((s) => s.language);
+    const theme = useSettingsStore((s) => s.theme);
+    const setLanguage = useSettingsStore((s) => s.setLanguage);
+    const setTheme = useSettingsStore((s) => s.setTheme);
 
-  const footerRef = useRef<HTMLDivElement>(null);
-  const [rawMenuOpen, setRawMenuOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [helpLogOpen, setHelpLogOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [langPanelOpen, setLangPanelOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState({ left: 0, bottom: 0 });
+    const footerRef = useRef<HTMLDivElement>(null);
+    const [rawMenuOpen, setRawMenuOpen] = useState(false);
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
+    const [helpLogOpen, setHelpLogOpen] = useState(false);
+    const [aboutOpen, setAboutOpen] = useState(false);
+    const [langPanelOpen, setLangPanelOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState({ left: 0, bottom: 0 });
 
-  const close = () => {
-    setRawMenuOpen(false);
-    setLangPanelOpen(false);
-  };
-
-  const openMenu = () => {
-    if (footerRef.current) {
-      const rect = footerRef.current.getBoundingClientRect();
-      setMenuPos({ left: rect.left + 8, bottom: window.innerHeight - rect.top + 8 });
-    }
-    setRawMenuOpen(true);
-  };
-
-  // Click outside to close
-  useEffect(() => {
-    if (!rawMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (footerRef.current && !footerRef.current.contains(e.target as Node)) {
-        close();
-      }
+    const close = () => {
+      setRawMenuOpen(false);
+      setLangPanelOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [rawMenuOpen]);
 
-  return (
-    <div ref={footerRef} className="relative border-t border-bdr-sub">
-      <button
-        onClick={() => (rawMenuOpen ? close() : openMenu())}
-        className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md hover:bg-elevated transition-colors cursor-pointer"
-      >
-        <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-xs font-bold text-accent">M</span>
-        </div>
-        <div className="flex-1 min-w-0 text-left">
-          <div className="text-xs font-medium text-txt truncate">MiMo User</div>
-          <div className="text-[10px] text-txt-g truncate">{t("click_to_settings")}</div>
-        </div>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-txt-g transition-transform ${rawMenuOpen ? "rotate-180" : ""}`}
-        />
-      </button>
+    const openMenu = () => {
+      if (footerRef.current) {
+        const rect = footerRef.current.getBoundingClientRect();
+        setMenuPos({ left: rect.left + 8, bottom: window.innerHeight - rect.top + 8 });
+      }
+      setRawMenuOpen(true);
+    };
 
-      {rawMenuOpen && (
-        <div
-          className="fixed z-[100]"
-          style={{ left: menuPos.left, bottom: menuPos.bottom }}
+    // Click outside to close
+    useEffect(() => {
+      if (!rawMenuOpen) return;
+      const handler = (e: MouseEvent) => {
+        if (footerRef.current && !footerRef.current.contains(e.target as Node)) {
+          close();
+        }
+      };
+      document.addEventListener("mousedown", handler);
+      return () => document.removeEventListener("mousedown", handler);
+    }, [rawMenuOpen]);
+
+    return (
+      <div ref={footerRef} className="relative border-t border-bdr-sub">
+        <button
+          onClick={() => (rawMenuOpen ? close() : openMenu())}
+          className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md hover:bg-elevated transition-colors cursor-pointer"
         >
-          {/* Main menu 170px */}
-          <div className="w-[170px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
-            {/* Settings */}
-            <button
-              onClick={() => { onOpenSettings(); close(); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
-            >
-              <Settings className="w-3.5 h-3.5 text-txt-g" />
-              {t("settings")}
-            </button>
+          <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-accent">M</span>
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-xs font-medium text-txt truncate">MiMo User</div>
+            <div className="text-[10px] text-txt-g truncate">{t("click_to_settings")}</div>
+          </div>
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-txt-g transition-transform ${rawMenuOpen ? "rotate-180" : ""}`}
+          />
+        </button>
 
-            {/* Shortcuts */}
-            <button
-              onClick={() => { close(); setShortcutsOpen(true); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
-            >
-              <Keyboard className="w-3.5 h-3.5 text-txt-g" />
-              {t("shortcuts")}
-            </button>
+        {rawMenuOpen && (
+          <div
+            className="fixed z-[100]"
+            style={{ left: menuPos.left, bottom: menuPos.bottom }}
+          >
+            {/* Main menu 170px */}
+            <div className="w-[170px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
+              {/* Memory */}
+              <button
+                onClick={() => { close(); onOpenMemory(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Database className="w-3.5 h-3.5 text-txt-g" />
+                {t("memory") || "记忆"}
+              </button>
 
-            {/* Help Log */}
-            <button
-              onClick={() => { close(); setHelpLogOpen(true); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-txt-g" />
-              {t("help_log")}
-            </button>
+              {/* Checkpoint */}
+              <button
+                onClick={() => { close(); onOpenCheckpoint(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <History className="w-3.5 h-3.5 text-txt-g" />
+                {t("checkpoint") || "检查点"}
+              </button>
 
-            {/* About */}
-            <button
-              onClick={() => { close(); setAboutOpen(true); }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
-            >
-              <Info className="w-3.5 h-3.5 text-txt-g" />
-              {t("about")}
-            </button>
+              {/* Task */}
+              <button
+                onClick={() => { close(); onOpenTask(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <ListTodo className="w-3.5 h-3.5 text-txt-g" />
+                {t("task") || "任务"}
+              </button>
 
-            {/* Divider */}
-            <div className="border-t border-bdr-sub my-1 mx-1" />
+              {/* Actor */}
+              <button
+                onClick={() => { close(); onOpenActor(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Bot className="w-3.5 h-3.5 text-txt-g" />
+                {t("actor") || "子智能体"}
+              </button>
 
-            {/* Language */}
-            <div
-              className="relative"
-              onMouseEnter={() => setLangPanelOpen(true)}
-              onMouseLeave={() => setLangPanelOpen(false)}
-            >
-              <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md">
-                <span className="flex items-center gap-2.5">
-                  <Languages className="w-3.5 h-3.5 text-txt-g" />
-                  {t("language")}
-                </span>
-                <span className="flex items-center gap-1 text-txt-m">
-                  {language === "zh" ? t("chinese") : t("english")}
-                  <ChevronRight className="w-3 h-3" />
-                </span>
+              {/* Divider */}
+              <div className="border-t border-bdr-sub my-1 mx-1" />
+
+              {/* Settings */}
+              <button
+                onClick={() => { onOpenSettings(); close(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Settings className="w-3.5 h-3.5 text-txt-g" />
+                {t("settings")}
+              </button>
+
+              {/* Shortcuts */}
+              <button
+                onClick={() => { close(); setShortcutsOpen(true); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Keyboard className="w-3.5 h-3.5 text-txt-g" />
+                {t("shortcuts")}
+              </button>
+
+              {/* Help Log */}
+              <button
+                onClick={() => { close(); setHelpLogOpen(true); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-txt-g" />
+                {t("help_log")}
+              </button>
+
+              {/* About */}
+              <button
+                onClick={() => { close(); setAboutOpen(true); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Info className="w-3.5 h-3.5 text-txt-g" />
+                {t("about")}
+              </button>
+
+              {/* Divider */}
+              <div className="border-t border-bdr-sub my-1 mx-1" />
+
+              {/* Language */}
+              <div
+                className="relative"
+                onMouseEnter={() => setLangPanelOpen(true)}
+                onMouseLeave={() => setLangPanelOpen(false)}
+              >
+                <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md">
+                  <span className="flex items-center gap-2.5">
+                    <Languages className="w-3.5 h-3.5 text-txt-g" />
+                    {t("language")}
+                  </span>
+                  <span className="flex items-center gap-1 text-txt-m">
+                    {language === "zh" ? t("chinese") : t("english")}
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+
+                {langPanelOpen && (
+                  <div className="absolute left-full bottom-0 w-[120px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
+                    <div className="px-2.5 py-1 text-[10px] text-txt-g uppercase tracking-wider">
+                      {t("language")}
+                    </div>
+                    <button
+                      onClick={() => { setLanguage("zh"); close(); }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${language === "zh" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
+                        }`}
+                    >
+                      {t("chinese")}
+                      {language === "zh" && <span className="text-accent">&#10003;</span>}
+                    </button>
+                    <button
+                      onClick={() => { setLanguage("en"); close(); }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${language === "en" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
+                        }`}
+                    >
+                      {t("english")}
+                      {language === "en" && <span className="text-accent">&#10003;</span>}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {langPanelOpen && (
-                <div className="absolute left-full bottom-0 w-[120px] bg-surface border border-bdr rounded-lg shadow-xl px-2 py-1.5 animate-pop-up">
-                  <div className="px-2.5 py-1 text-[10px] text-txt-g uppercase tracking-wider">
-                    {t("language")}
-                  </div>
-                  <button
-                    onClick={() => { setLanguage("zh"); close(); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${
-                      language === "zh" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
+              {/* Theme toggle */}
+              <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 rounded-md">
+                <span className="flex items-center gap-2.5">
+                  {theme === "dark" ? (
+                    <Moon className="w-3.5 h-3.5 text-txt-g" />
+                  ) : (
+                    <Sun className="w-3.5 h-3.5 text-txt-g" />
+                  )}
+                  {t("theme")}
+                </span>
+                <button
+                  onClick={(e) => setTheme(theme === "dark" ? "light" : "dark", e.clientX, e.clientY)}
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer flex-shrink-0 ${theme === "dark" ? "bg-accent" : "bg-elevated border border-bdr"
                     }`}
-                  >
-                    {t("chinese")}
-                    {language === "zh" && <span className="text-accent">&#10003;</span>}
-                  </button>
-                  <button
-                    onClick={() => { setLanguage("en"); close(); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${
-                      language === "en" ? "text-accent bg-accent/10" : "text-txt-2 hover:bg-elevated"
-                    }`}
-                  >
-                    {t("english")}
-                    {language === "en" && <span className="text-accent">&#10003;</span>}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Theme toggle */}
-            <div className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-2 rounded-md">
-              <span className="flex items-center gap-2.5">
-                {theme === "dark" ? (
-                  <Moon className="w-3.5 h-3.5 text-txt-g" />
-                ) : (
-                  <Sun className="w-3.5 h-3.5 text-txt-g" />
-                )}
-                {t("theme")}
-              </span>
-              <button
-                onClick={(e) => setTheme(theme === "dark" ? "light" : "dark", e.clientX, e.clientY)}
-                className={`relative w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer flex-shrink-0 ${
-                  theme === "dark" ? "bg-accent" : "bg-elevated border border-bdr"
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
-                    theme === "dark" ? "translate-x-4" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
+                >
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${theme === "dark" ? "translate-x-4" : "translate-x-0.5"
+                      }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <HelpLogPanel open={helpLogOpen} onClose={() => setHelpLogOpen(false)} />
-      <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
-    </div>
-  );
-}
+        <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <HelpLogPanel open={helpLogOpen} onClose={() => setHelpLogOpen(false)} />
+        <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      </div>
+    );
+  }
 }

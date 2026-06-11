@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAgent } from "./hooks/useAgent";
 import { useChatStore } from "./stores/chatStore";
@@ -61,6 +61,43 @@ declare global {
           SelectDirectory: () => Promise<string>;
           ListRemoteModels: (modelName: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
           ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
+          // Checkpoint methods
+          CreateCheckpoint: (summary: string) => Promise<{ success: boolean; message: string; id?: string }>;
+          ListCheckpoints: () => Promise<Array<{ id: string; summary: string; token_count: number; message_offset: number; created_at: string }>>;
+          RestoreCheckpoint: (checkpointId: string) => Promise<{ success: boolean; message: string; id?: string }>;
+          DeleteCheckpoint: (checkpointId: string) => Promise<{ success: boolean; message: string }>;
+          ExportCheckpoints: () => Promise<string>;
+          // Memory methods
+          MemorySearch: (query: string, scope: string, limit: number) => Promise<Array<{ path: string; snippet: string; score: number; scope: string; scope_id: string; type: string }>>;
+          MemoryReconcile: () => Promise<[number, number]>;
+          MemoryCount: () => Promise<number>;
+          MemoryIndexFile: (path: string) => Promise<boolean>;
+          WriteMemory: (path: string, content: string) => Promise<boolean>;
+          ReadMemory: (path: string) => Promise<string>;
+          ListMemoryFiles: () => Promise<Array<{ path: string; name: string; size: number; updatedAt: string; scope: string }>>;
+          // Task methods
+          TaskCreate: (summary: string, parentID: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
+          TaskList: (status: string, includeTerminal: boolean) => Promise<Array<{ id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number }>>;
+          TaskStart: (id: string, owner: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
+          TaskDone: (id: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
+          TaskBlock: (id: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
+          TaskDelete: (id: string) => Promise<{ success: boolean; message: string }>;
+          TaskGetEvents: (taskID: string) => Promise<Array<{ id: number; task_id: string; at: number; kind: string; summary?: string }>>;
+          // Actor methods
+          ActorSpawn: (actorType: string, prompt: string, taskID: string) => Promise<{ success: boolean; message: string; actor?: { id: string; type: string; session_id: string; parent_id?: string; status: string; prompt: string; result?: string; error?: string; created_at: number; started_at?: number; completed_at?: number } }>;
+          ActorList: (status: string) => Promise<Array<{ id: string; type: string; session_id: string; status: string; prompt: string; result?: string; error?: string; created_at: number; completed_at?: number }>>;
+          ActorGet: (id: string) => Promise<{ id: string; type: string; session_id: string; parent_id?: string; status: string; prompt: string; result?: string; error?: string; created_at: number; started_at?: number; completed_at?: number } | null>;
+          ActorCancel: (id: string) => Promise<{ success: boolean; message: string }>;
+          ActorCleanup: (maxAge: number) => Promise<number>;
+          // Multi-agent methods
+          AgentListConfigs: () => Promise<Array<{ name: string; mode: string; color: string; description: string; prompt: string }>>;
+          AgentGetCurrent: () => Promise<{ name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } | null>;
+          AgentSwitch: (name: string) => Promise<{ success: boolean; message: string; agent?: { name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } }>;
+          AgentUpdateConfig: (name: string, config: { name: string; mode: string; color: string; description: string; prompt: string }) => Promise<{ success: boolean; message: string }>;
+          // Dream & Distill methods
+          DreamRun: () => Promise<{ success: boolean; message: string; count: number }>;
+          DistillRun: () => Promise<{ success: boolean; message: string; count: number }>;
+          DistillListCandidates: () => Promise<Array<{ name: string; description: string; confidence: number; pattern?: string; commands?: string[] }>>;
         };
       };
     };

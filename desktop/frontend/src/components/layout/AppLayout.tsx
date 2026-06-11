@@ -1,15 +1,20 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useActivityStore } from "../../stores/activityStore";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
+import { SessionTabs } from "../session/SessionTabs";
 import { MessageList } from "../chat/MessageList";
 import { ChatInput } from "../chat/ChatInput";
 import { StatusBar } from "../chat/StatusBar";
 import { ConfirmDialog } from "../confirm/ConfirmDialog";
 import { ToolsViewer } from "../common/ToolsViewer";
 import { SettingsPage } from "../settings/SettingsPage";
+import { MemoryPanelModal } from "../common/MemoryPanelModal";
+import { CheckpointPanelModal } from "../common/CheckpointPanelModal";
+import { TaskPanelModal } from "../common/TaskPanelModal";
+import { ActorPanelModal } from "../common/ActorPanelModal";
 import { WelcomeView } from "../welcome/WelcomeView";
 import { useChatStore } from "../../stores/chatStore";
 import {
@@ -63,6 +68,10 @@ export function AppLayout({
   const usage = useChatStore((s) => s.usage);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [checkpointOpen, setCheckpointOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [actorOpen, setActorOpen] = useState(false);
 
   const [isMaximised, setIsMaximised] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -183,6 +192,10 @@ export function AppLayout({
               onDeleteSession={onDeleteSession}
               onExportSession={onExportSession}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenMemory={() => setMemoryOpen(true)}
+              onOpenCheckpoint={() => setCheckpointOpen(true)}
+              onOpenTask={() => setTaskOpen(true)}
+              onOpenActor={() => setActorOpen(true)}
             />
           )}
         </div>
@@ -193,6 +206,11 @@ export function AppLayout({
             <WelcomeView onSend={onSend} onSelectWorkspace={onSelectWorkspace} />
           ) : (
             <>
+              <SessionTabs
+                onNewChat={onNewChat}
+                onLoadSession={onLoadSession}
+                onCloseSession={onDeleteSession}
+              />
               <MessageList />
               <ChatInput onSend={onSend} onCancel={onCancel} />
               <StatusBar modelName={modelName} />
@@ -219,6 +237,12 @@ export function AppLayout({
 
       {/* Tools Viewer Modal */}
       <ToolsViewer open={toolsOpen} onClose={() => setToolsOpen(false)} />
+
+      {/* Memory / Checkpoint / Task / Actor Modals — rendered outside sidebar to avoid overflow-hidden clipping */}
+      <MemoryPanelModal open={memoryOpen} onClose={() => setMemoryOpen(false)} />
+      <CheckpointPanelModal open={checkpointOpen} onClose={() => setCheckpointOpen(false)} />
+      <TaskPanelModal open={taskOpen} onClose={() => setTaskOpen(false)} />
+      <ActorPanelModal open={actorOpen} onClose={() => setActorOpen(false)} />
 
       {/* Confirm Dialog (global overlay) */}
       <ConfirmDialog
