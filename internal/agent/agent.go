@@ -31,20 +31,21 @@ type Agent struct {
 	onToolResult     func(name string, result string)
 	onError          func(err error)
 	onUsage          func(usage llm.Usage)
-	onCompressing    func() // 上下文压缩开始时回调
+	onCompressing    func()               // 上下文压缩开始时回调
 	onPlanning       func(message string) // 正在生成计划回调
-	onPlanGenerated  func(plan *Plan) // 计划生成完成回调
+	onPlanGenerated  func(plan *Plan)     // 计划生成完成回调
 	onPlanStepStart  func(step *PlanStep) // 计划步骤开始执行回调
 	onPlanStepDone   func(step *PlanStep) // 计划步骤完成回调
 
 	// Configuration
 	maxIterations    int
 	maxContextTokens int
-	maxParallelTools int // 最大并行工具数
+	maxParallelTools int          // 最大并行工具数
 	planningMode     PlanningMode // 规划模式
 	reasoningLevel   string       // reasoning effort level: low, medium, high
 	verbose          bool
 	confirmAll       bool // 是否确认所有操作
+	toolAllowlist    map[string]struct{}
 }
 
 // NewAgent creates a new Agent
@@ -53,14 +54,14 @@ func NewAgent(gateway *llm.Gateway, registry *tools.Registry, guardrail *safety.
 		maxContextTokens = 128000 // default
 	}
 	return &Agent{
-		gateway:         gateway,
-		registry:        registry,
-		guardrail:       guardrail,
-		planner:         NewPlanner(gateway),
-		maxIterations:   maxIterations,
+		gateway:          gateway,
+		registry:         registry,
+		guardrail:        guardrail,
+		planner:          NewPlanner(gateway),
+		maxIterations:    maxIterations,
 		maxContextTokens: maxContextTokens,
 		maxParallelTools: 5,
-		planningMode:    ModeAuto,
+		planningMode:     ModeAuto,
 	}
 }
 
@@ -129,6 +130,46 @@ func (a *Agent) SetReasoningLevel(level string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.reasoningLevel = level
+}
+
+// SetToolAllowlist limits the tools exposed to and executable by the agent.
+// An empty allowlist means all registered tools are available.
+func (a *Agent) SetToolAllowlist(names []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if len(names) == 0 {
+		a.toolAllowlist = nil
+		return
+	}
+
+	allowlist := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		allowlist[name] = struct{}{}
+	}
+	if len(allowlist) == 0 {
+		a.toolAllowlist = nil
+		return
+	}
+	a.toolAllowlist = allowlist
+}
+
+func (a *Agent) isToolAllowed(name string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.isToolAllowedLocked(name)
+}
+
+func (a *Agent) isToolAllowedLocked(name string) bool {
+	if len(a.toolAllowlist) == 0 {
+		return true
+	}
+	_, ok := a.toolAllowlist[name]
+	return ok
 }
 
 // CompressContext manually triggers context compression.
@@ -262,11 +303,10 @@ func (a *Agent) ChatStream(ctx context.Context, userMessage string, attachments 
 	return a.runStreamLoop(ctx)
 }
 
-
 // isComplexTask determines if a task needs planning based on keywords and structure
 func (a *Agent) isComplexTask(task string) bool {
 	task = strings.ToLower(strings.TrimSpace(task))
-	
+
 	// Simple patterns that don't need planning (single-step tasks)
 	simplePatterns := []string{
 		// Greetings
@@ -279,13 +319,13 @@ func (a *Agent) isComplexTask(task string) bool {
 		"创建一个", "新建一个", "写一个", "生成一个", "写入一个",
 		"create a", "write a", "generate a",
 	}
-	
+
 	for _, pattern := range simplePatterns {
 		if strings.HasPrefix(task, pattern) {
 			return false
 		}
 	}
-	
+
 	// Complex task indicators (require multiple steps)
 	complexIndicators := []string{
 		// Project-level tasks
@@ -295,26 +335,27 @@ func (a *Agent) isComplexTask(task string) bool {
 		// Build/deploy with multiple components
 		"搭建环境", "部署服务", "setup environment", "deploy service",
 	}
-	
+
 	// Check for complex task keywords
 	for _, indicator := range complexIndicators {
 		if strings.Contains(task, indicator) {
 			return true
 		}
 	}
-	
+
 	// Check task length (very long tasks are usually complex)
 	if len(task) > 200 {
 		return true
 	}
-	
+
 	// Check for multiple explicit requests (3+ sentences)
 	if strings.Count(task, "。") >= 2 || strings.Count(task, "\n") >= 3 {
 		return true
 	}
-	
+
 	return false
 }
+
 // runPlanExecuteLoop runs the Plan-Execute loop
 func (a *Agent) runPlanExecuteLoop(ctx context.Context, task string) (string, error) {
 	// 发送规划状态
@@ -379,6 +420,12 @@ func (a *Agent) runPlanExecuteLoop(ctx context.Context, task string) (string, er
 					allowed, err := a.guardrail.CheckWithConfirmAll(step.ToolName, params, a.confirmAll)
 					if !allowed {
 						stepErr = fmt.Errorf("blocked by safety: %w", err)
+					}
+				}
+
+				if stepErr == nil {
+					if !a.isToolAllowed(step.ToolName) {
+						stepErr = fmt.Errorf("tool %q is not allowed for the current agent", step.ToolName)
 					}
 				}
 
@@ -670,6 +717,10 @@ func (a *Agent) runStreamLoop(ctx context.Context) (string, error) {
 
 // executeToolCall executes a single tool call
 func (a *Agent) executeToolCall(ctx context.Context, tc llm.ToolCall) (string, error) {
+	if !a.isToolAllowed(tc.Function.Name) {
+		return "", fmt.Errorf("tool %q is not allowed for the current agent", tc.Function.Name)
+	}
+
 	// Parse arguments
 	params := make(map[string]interface{})
 	if tc.Function.Arguments != "" && tc.Function.Arguments != "{}" {
@@ -745,22 +796,28 @@ func (a *Agent) executeToolCallsParallel(ctx context.Context, toolCalls []llm.To
 // toolDefinitions returns LLM tool definitions for all registered tools
 func (a *Agent) toolDefinitions() []llm.ToolDefinition {
 	defs := a.registry.Definitions()
-	result := make([]llm.ToolDefinition, len(defs))
-	for i, d := range defs {
+	result := make([]llm.ToolDefinition, 0, len(defs))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for _, d := range defs {
 		fn, _ := d["function"].(map[string]interface{})
 		if fn == nil {
 			continue
 		}
 		name, _ := fn["name"].(string)
+		if !a.isToolAllowedLocked(name) {
+			continue
+		}
 		desc, _ := fn["description"].(string)
-		result[i] = llm.ToolDefinition{
+		result = append(result, llm.ToolDefinition{
 			Type: "function",
 			Function: llm.ToolFuncDefinition{
 				Name:        name,
 				Description: desc,
 				Parameters:  fn["parameters"],
 			},
-		}
+		})
 	}
 	return result
 }
@@ -1113,7 +1170,3 @@ func mergeToolCalls(chunks []llm.ToolCall) []llm.ToolCall {
 	}
 	return result
 }
-
-
-
-

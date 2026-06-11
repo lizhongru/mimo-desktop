@@ -161,7 +161,7 @@ export function ActorPanel() {
         <select
           value={actorType}
           onChange={(e) => setActorType(e.target.value)}
-          className="w-full p-2 text-sm bg-elevated border border-bdr rounded"
+          className="w-full px-3 py-2 text-sm text-txt bg-elevated border border-bdr rounded-md focus:outline-none focus:border-accent/50"
         >
           {ACTOR_TYPES.map((type) => (
             <option key={type.value} value={type.value}>
@@ -173,7 +173,7 @@ export function ActorPanel() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="输入提示词..."
-          className="w-full p-2 text-sm bg-elevated border border-bdr rounded resize-none"
+          className="w-full px-3 py-2 text-sm text-txt placeholder:text-txt-m bg-elevated border border-bdr rounded-md resize-none focus:outline-none focus:border-accent/50"
           rows={3}
         />
         <button

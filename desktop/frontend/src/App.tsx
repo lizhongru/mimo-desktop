@@ -90,10 +90,10 @@ declare global {
           ActorCancel: (id: string) => Promise<{ success: boolean; message: string }>;
           ActorCleanup: (maxAge: number) => Promise<number>;
           // Multi-agent methods
-          AgentListConfigs: () => Promise<Array<{ name: string; mode: string; color: string; description: string; prompt: string }>>;
+          AgentListConfigs: () => Promise<Array<{ name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] }>>;
           AgentGetCurrent: () => Promise<{ name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } | null>;
           AgentSwitch: (name: string) => Promise<{ success: boolean; message: string; agent?: { name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } }>;
-          AgentUpdateConfig: (name: string, config: { name: string; mode: string; color: string; description: string; prompt: string }) => Promise<{ success: boolean; message: string }>;
+          AgentUpdateConfig: (name: string, config: { name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] }) => Promise<{ success: boolean; message: string }>;
           // Dream & Distill methods
           DreamRun: () => Promise<{ success: boolean; message: string; count: number }>;
           DistillRun: () => Promise<{ success: boolean; message: string; count: number }>;

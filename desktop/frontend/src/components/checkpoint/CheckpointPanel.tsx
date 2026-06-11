@@ -126,7 +126,7 @@ export function CheckpointPanel() {
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           placeholder="输入检查点摘要..."
-          className="w-full p-2 text-sm bg-elevated border border-bdr rounded resize-none"
+          className="w-full px-3 py-2 text-sm text-txt placeholder:text-txt-m bg-elevated border border-bdr rounded-md resize-none focus:outline-none focus:border-accent/50"
           rows={3}
         />
         <button

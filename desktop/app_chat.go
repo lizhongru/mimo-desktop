@@ -41,6 +41,9 @@ func (a *App) SendMessage(message string, attachmentsJSON string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	workingDir := a.currentSessionWorkingDir()
+	if config := getMultiAgentManager().GetCurrent(); config != nil {
+		a.agent.SetToolAllowlist(config.ToolAllowlist)
+	}
 	a.agent.SystemPrompt(a.buildSystemPrompt(workingDir))
 	if workingDir != "" {
 		ctx = tools.WithWorkingDir(ctx, workingDir)

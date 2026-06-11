@@ -57,14 +57,7 @@ func (a *App) AgentGetCurrent() *AgentConfigInfo {
 	if config == nil {
 		return nil
 	}
-	return &AgentConfigInfo{
-		Name:          config.Name,
-		Mode:          string(config.Mode),
-		Color:         config.Color,
-		Description:   config.Description,
-		Prompt:        config.Prompt,
-		ToolAllowlist: config.ToolAllowlist,
-	}
+	return agentConfigInfoFromConfig(config)
 }
 
 // AgentSwitch switches to a different agent
@@ -79,20 +72,14 @@ func (a *App) AgentSwitch(name string) AgentSwitchResult {
 
 	config := manager.GetCurrent()
 
-	// Update agent system prompt if available
 	if a.agent != nil && config != nil {
-		// System prompt will be applied on next message
+		a.agent.SetToolAllowlist(config.ToolAllowlist)
 	}
 
 	return AgentSwitchResult{
 		Success: true,
 		Message: "Switched to " + name + " agent",
-		Agent: &AgentConfigInfo{
-			Name:        config.Name,
-			Mode:        string(config.Mode),
-			Color:       config.Color,
-			Description: config.Description,
-		},
+		Agent:   agentConfigInfoFromConfig(config),
 	}
 }
 
@@ -108,4 +95,18 @@ func (a *App) AgentUpdateConfig(name string, config AgentConfigInfo) AgentSwitch
 		ToolAllowlist: config.ToolAllowlist,
 	})
 	return AgentSwitchResult{Success: true, Message: "Agent config updated"}
+}
+
+func agentConfigInfoFromConfig(config *agent.AgentConfig) *AgentConfigInfo {
+	if config == nil {
+		return nil
+	}
+	return &AgentConfigInfo{
+		Name:          config.Name,
+		Mode:          string(config.Mode),
+		Color:         config.Color,
+		Description:   config.Description,
+		Prompt:        config.Prompt,
+		ToolAllowlist: config.ToolAllowlist,
+	}
 }

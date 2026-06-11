@@ -183,6 +183,24 @@ func (a *App) buildSystemPrompt(projectDir string) string {
 	}
 	ctxManager := mctx.NewManager(projectDir, a.cfg.Context.MaxTokens, a.ignoreMatcher)
 	systemPrompt := ctxManager.BuildSystemPrompt()
+	if config := getMultiAgentManager().GetCurrent(); config != nil {
+		systemPrompt += "\n\n## Current Agent Mode\n\n"
+		systemPrompt += fmt.Sprintf("Active agent: %s (%s)\n", config.Name, config.Mode)
+		if config.Description != "" {
+			systemPrompt += fmt.Sprintf("Agent purpose: %s\n", config.Description)
+		}
+		if config.Prompt != "" {
+			systemPrompt += "\nAgent-specific instructions:\n"
+			systemPrompt += config.Prompt
+			systemPrompt += "\n"
+		}
+		if len(config.ToolAllowlist) > 0 {
+			systemPrompt += "\nOnly these tools are available in this mode:\n"
+			for _, toolName := range config.ToolAllowlist {
+				systemPrompt += fmt.Sprintf("- %s\n", toolName)
+			}
+		}
+	}
 	if a.mcpManager == nil {
 		return systemPrompt
 	}
