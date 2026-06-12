@@ -137,6 +137,30 @@ func TestSaveSessionFromFrontendSkipsAutoCheckpointBelowThreshold(t *testing.T) 
 	}
 }
 
+func TestSaveSessionFromFrontendRespectsDisabledAutoCheckpointConfig(t *testing.T) {
+	app, store, sessionID := newCheckpointTestApp(t, 20)
+	app.cfg.Checkpoint.AutoCheckpoint = false
+	app.cfg.Checkpoint.TokenThreshold = 0.01
+	app.cfg.Checkpoint.MaxCheckpoints = 10
+	app.cfg.Checkpoint.ContextBudget = 20
+
+	err := app.SaveSessionFromFrontend(sessionID, []ChatMessageDTO{
+		{Role: "user", Content: "hello"},
+		{Role: "assistant", Content: "world"},
+	})
+	if err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+
+	checkpoints, err := store.ListCheckpoints(sessionID)
+	if err != nil {
+		t.Fatalf("list checkpoints: %v", err)
+	}
+	if len(checkpoints) != 0 {
+		t.Fatalf("checkpoint count = %d, want 0", len(checkpoints))
+	}
+}
+
 func TestSaveSessionFromFrontendDoesNotDuplicateAutoCheckpointAtSameOffset(t *testing.T) {
 	app, store, sessionID := newCheckpointTestApp(t, 20)
 	messages := []ChatMessageDTO{

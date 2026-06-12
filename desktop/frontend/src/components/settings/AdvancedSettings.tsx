@@ -1,16 +1,17 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Database,
   History,
   Shield,
   Save,
-  RotateCcw,
 } from "lucide-react";
 
 interface CheckpointConfig {
   autoCheckpoint: boolean;
   tokenThreshold: number;
   maxCheckpoints: number;
+  reconstructOnResume: boolean;
+  contextBudget: number;
 }
 
 interface MemoryConfig {
@@ -25,32 +26,28 @@ interface PermissionConfig {
   bash: string;
 }
 
-interface Props {
-  onSave?: (config: {
-    checkpoint: CheckpointConfig;
-    memory: MemoryConfig;
-    permission: PermissionConfig;
-  }) => void;
+export interface AdvancedSettingsConfig {
+  checkpoint: CheckpointConfig;
+  memory: MemoryConfig;
+  permission: PermissionConfig;
 }
 
-export function AdvancedSettings({ onSave }: Props) {
-  const [checkpoint, setCheckpoint] = useState<CheckpointConfig>({
-    autoCheckpoint: true,
-    tokenThreshold: 75,
-    maxCheckpoints: 10,
-  });
+interface Props {
+  value: AdvancedSettingsConfig;
+  saving?: boolean;
+  onSave?: (config: AdvancedSettingsConfig) => void;
+}
 
-  const [memory, setMemory] = useState<MemoryConfig>({
-    ccIndex: false,
-    searchScoreFloor: 15,
-  });
+export function AdvancedSettings({ value, saving = false, onSave }: Props) {
+  const [checkpoint, setCheckpoint] = useState<CheckpointConfig>(value.checkpoint);
+  const [memory, setMemory] = useState<MemoryConfig>(value.memory);
+  const [permission, setPermission] = useState<PermissionConfig>(value.permission);
 
-  const [permission, setPermission] = useState<PermissionConfig>({
-    read: "allow",
-    write: "ask",
-    edit: "ask",
-    bash: "ask",
-  });
+  useEffect(() => {
+    setCheckpoint(value.checkpoint);
+    setMemory(value.memory);
+    setPermission(value.permission);
+  }, [value]);
 
   const handleSave = useCallback(() => {
     onSave?.({ checkpoint, memory, permission });
@@ -82,18 +79,21 @@ export function AdvancedSettings({ onSave }: Props) {
             <span>触发阈值:</span>
             <input
               type="range"
-              min="50"
-              max="90"
+              min="0.5"
+              max="0.9"
+              step="0.01"
               value={checkpoint.tokenThreshold}
               onChange={(e) =>
                 setCheckpoint({
                   ...checkpoint,
-                  tokenThreshold: parseInt(e.target.value),
+                  tokenThreshold: Number(e.target.value),
                 })
               }
               className="flex-1"
             />
-            <span className="w-12 text-right">{checkpoint.tokenThreshold}%</span>
+            <span className="w-12 text-right">
+              {Math.round(checkpoint.tokenThreshold * 100)}%
+            </span>
           </div>
 
           <div className="flex items-center gap-3 text-sm">
@@ -112,6 +112,38 @@ export function AdvancedSettings({ onSave }: Props) {
               className="w-20 px-2 py-1 bg-elevated border border-bdr rounded text-sm"
             />
           </div>
+
+          <div className="flex items-center gap-3 text-sm">
+            <span>上下文预算:</span>
+            <input
+              type="number"
+              min="1000"
+              step="1000"
+              value={checkpoint.contextBudget}
+              onChange={(e) =>
+                setCheckpoint({
+                  ...checkpoint,
+                  contextBudget: parseInt(e.target.value) || 128000,
+                })
+              }
+              className="w-28 px-2 py-1 bg-elevated border border-bdr rounded text-sm"
+            />
+          </div>
+
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={checkpoint.reconstructOnResume}
+              onChange={(e) =>
+                setCheckpoint({
+                  ...checkpoint,
+                  reconstructOnResume: e.target.checked,
+                })
+              }
+              className="rounded border-bdr"
+            />
+            <span>恢复会话时重建上下文</span>
+          </label>
         </div>
       </div>
 
@@ -139,18 +171,21 @@ export function AdvancedSettings({ onSave }: Props) {
             <span>搜索分数下限:</span>
             <input
               type="range"
-              min="5"
-              max="50"
+              min="0.05"
+              max="0.5"
+              step="0.01"
               value={memory.searchScoreFloor}
               onChange={(e) =>
                 setMemory({
                   ...memory,
-                  searchScoreFloor: parseInt(e.target.value),
+                  searchScoreFloor: Number(e.target.value),
                 })
               }
               className="flex-1"
             />
-            <span className="w-12 text-right">{memory.searchScoreFloor}%</span>
+            <span className="w-12 text-right">
+              {Math.round(memory.searchScoreFloor * 100)}%
+            </span>
           </div>
         </div>
       </div>
@@ -186,10 +221,11 @@ export function AdvancedSettings({ onSave }: Props) {
       <div className="flex justify-end gap-2 pt-4 border-t border-bdr">
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-md text-sm hover:bg-accent/90"
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-md text-sm hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Save className="w-4 h-4" />
-          保存设置
+          {saving ? "保存中..." : "保存设置"}
         </button>
       </div>
     </div>

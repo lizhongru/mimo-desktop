@@ -13,6 +13,20 @@ function workspaceIdFromDir(dir: string): string {
   return dir ? `ws:${dir}` : DEFAULT_WS;
 }
 
+type AdvancedSettingsConfig = {
+  memory: { ccIndex: boolean; searchScoreFloor: number };
+  checkpoint: {
+    autoCheckpoint: boolean;
+    tokenThreshold: number;
+    maxCheckpoints: number;
+    reconstructOnResume: boolean;
+    contextBudget: number;
+  };
+  permission: {
+    rules: Array<{ permission: string; action: string; pattern?: string }>;
+  };
+};
+
 declare global {
   interface Window {
     go: {
@@ -42,10 +56,11 @@ declare global {
           MoveSession: (sessionId: string, workspaceId: string) => Promise<void>;
           SaveSessionFromFrontend: (sessionId: string, messages: unknown[]) => Promise<void>;
           // Config methods
-          GetConfig: () => Promise<{ defaultModel: string; language: string; theme: string; userName: string; models: Record<string, { provider: string; website: string; apiBase: string; apiKey: string; model: string; models: string[]; fallback: string; maxTokens: number; temperature: number; topP: number; streaming: boolean; vision: boolean; tools: boolean }>; safety: { level: string; permission: string }; agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean } }>;
+          GetConfig: () => Promise<{ defaultModel: string; language: string; theme: string; userName: string; models: Record<string, { provider: string; website: string; apiBase: string; apiKey: string; model: string; models: string[]; fallback: string; maxTokens: number; temperature: number; topP: number; streaming: boolean; vision: boolean; tools: boolean }>; safety: { level: string; permission: string }; agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean }; memory: AdvancedSettingsConfig["memory"]; checkpoint: AdvancedSettingsConfig["checkpoint"]; permission: AdvancedSettingsConfig["permission"] }>;
           SetTheme: (theme: string) => Promise<void>;
           SetLanguage: (lang: string) => Promise<void>;
           SetDefaultModel: (name: string) => Promise<void>;
+          UpdateAdvancedSettings: (settings: AdvancedSettingsConfig) => Promise<void>;
           AddModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
           UpdateModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
           RemoveModel: (name: string) => Promise<void>;

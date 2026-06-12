@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"os"
@@ -30,33 +30,42 @@ type Config struct {
 
 	// Context
 	Context ContextConfig `yaml:"context" mapstructure:"context"`
+
+	// Memory
+	Memory MemoryConfig `yaml:"memory" mapstructure:"memory"`
+
+	// Checkpoint
+	Checkpoint CheckpointConfig `yaml:"checkpoint" mapstructure:"checkpoint"`
+
+	// Permission rules
+	Permission PermissionConfig `yaml:"permission" mapstructure:"permission"`
 }
 
 // ModelConfig represents a single model provider configuration
 // ModelConfig represents a single model provider configuration
 type ModelConfig struct {
 	// Provider info
-	Provider    string `yaml:"provider" mapstructure:"provider"`       // e.g. "OpenAI", "MiMo", "Custom"
-	Website     string `yaml:"website" mapstructure:"website"`         // Provider website URL
-	
+	Provider string `yaml:"provider" mapstructure:"provider"` // e.g. "OpenAI", "MiMo", "Custom"
+	Website  string `yaml:"website" mapstructure:"website"`   // Provider website URL
+
 	// API settings
-	APIBase     string  `yaml:"api_base" mapstructure:"api_base"`
-	APIKey      string  `yaml:"api_key" mapstructure:"api_key"`
-	
+	APIBase string `yaml:"api_base" mapstructure:"api_base"`
+	APIKey  string `yaml:"api_key" mapstructure:"api_key"`
+
 	// Model settings
-	Model       string  `yaml:"model" mapstructure:"model"`            // Default model ID
-	Models      []string `yaml:"models" mapstructure:"models"`         // Available model IDs
-	Fallback    string   `yaml:"fallback" mapstructure:"fallback"`     // Fallback model ID
-	
+	Model    string   `yaml:"model" mapstructure:"model"`       // Default model ID
+	Models   []string `yaml:"models" mapstructure:"models"`     // Available model IDs
+	Fallback string   `yaml:"fallback" mapstructure:"fallback"` // Fallback model ID
+
 	// Generation parameters
 	MaxTokens   int     `yaml:"max_tokens" mapstructure:"max_tokens"`
 	Temperature float64 `yaml:"temperature" mapstructure:"temperature"`
 	TopP        float64 `yaml:"top_p" mapstructure:"top_p"`
-	
+
 	// Features
-	Streaming   bool    `yaml:"streaming" mapstructure:"streaming"`    // Support streaming
-	Vision      bool    `yaml:"vision" mapstructure:"vision"`          // Support vision/images
-	Tools       bool    `yaml:"tools" mapstructure:"tools"`            // Support function calling
+	Streaming bool `yaml:"streaming" mapstructure:"streaming"` // Support streaming
+	Vision    bool `yaml:"vision" mapstructure:"vision"`       // Support vision/images
+	Tools     bool `yaml:"tools" mapstructure:"tools"`         // Support function calling
 }
 
 // SafetyConfig represents safety-related configuration
@@ -88,6 +97,33 @@ type ContextConfig struct {
 	MaxTokens          int      `yaml:"max_tokens" mapstructure:"max_tokens"`
 	DirectoryTreeDepth int      `yaml:"directory_tree_depth" mapstructure:"directory_tree_depth"`
 	IgnorePatterns     []string `yaml:"ignore_patterns" mapstructure:"ignore_patterns"`
+}
+
+// MemoryConfig represents memory-system configuration.
+type MemoryConfig struct {
+	CCIndex          bool    `yaml:"cc_index" mapstructure:"cc_index"`
+	SearchScoreFloor float64 `yaml:"search_score_floor" mapstructure:"search_score_floor"`
+}
+
+// CheckpointConfig represents checkpoint behavior configuration.
+type CheckpointConfig struct {
+	AutoCheckpoint      bool    `yaml:"auto_checkpoint" mapstructure:"auto_checkpoint"`
+	TokenThreshold      float64 `yaml:"token_threshold" mapstructure:"token_threshold"`
+	MaxCheckpoints      int     `yaml:"max_checkpoints" mapstructure:"max_checkpoints"`
+	ReconstructOnResume bool    `yaml:"reconstruct_on_resume" mapstructure:"reconstruct_on_resume"`
+	ContextBudget       int     `yaml:"context_budget" mapstructure:"context_budget"`
+}
+
+// PermissionConfig represents persisted permission rules.
+type PermissionConfig struct {
+	Rules []PermissionRuleConfig `yaml:"rules" mapstructure:"rules"`
+}
+
+// PermissionRuleConfig represents one persisted permission rule.
+type PermissionRuleConfig struct {
+	Permission string `yaml:"permission" mapstructure:"permission" json:"permission"`
+	Action     string `yaml:"action" mapstructure:"action" json:"action"`
+	Pattern    string `yaml:"pattern,omitempty" mapstructure:"pattern" json:"pattern,omitempty"`
 }
 
 // MCPConfig represents MCP server configurations
@@ -131,7 +167,7 @@ func DefaultConfig() *Config {
 			ProtectedBranches: []string{"main", "master", "release/*"},
 		},
 		Agent: AgentConfig{
-		MaxIterations:      50,
+			MaxIterations:      50,
 			MaxParallelTools:   5,
 			PlanningMode:       "auto",
 			Permission:         "exec",
@@ -147,6 +183,26 @@ func DefaultConfig() *Config {
 			IgnorePatterns: []string{
 				"node_modules", ".git", "__pycache__", "dist",
 				"build", ".venv", "vendor",
+			},
+		},
+		Memory: MemoryConfig{
+			CCIndex:          true,
+			SearchScoreFloor: 0.15,
+		},
+		Checkpoint: CheckpointConfig{
+			AutoCheckpoint:      true,
+			TokenThreshold:      0.75,
+			MaxCheckpoints:      10,
+			ReconstructOnResume: true,
+			ContextBudget:       128000,
+		},
+		Permission: PermissionConfig{
+			Rules: []PermissionRuleConfig{
+				{Permission: "read", Action: "allow"},
+				{Permission: "write", Action: "ask"},
+				{Permission: "edit", Action: "ask"},
+				{Permission: "bash", Action: "ask"},
+				{Permission: "external_directory", Action: "deny"},
 			},
 		},
 		MCP: MCPConfig{

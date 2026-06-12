@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	iconfig "github.com/mimo-cli/mimo-cli/internal/config"
 	"github.com/mimo-cli/mimo-cli/internal/context"
 	"github.com/mimo-cli/mimo-cli/internal/llm"
 	"github.com/mimo-cli/mimo-cli/internal/session"
@@ -74,10 +75,7 @@ func (a *App) createCheckpointForSession(sessionID string, summary string, sourc
 
 	// Also create a checkpoint file in the session memory directory
 	wd, _ := os.Getwd()
-	checkpointMgr := context.NewCheckpointManager(
-		context.DefaultCheckpointConfig(),
-		wd,
-	)
+	checkpointMgr := context.NewCheckpointManager(a.checkpointRuntimeConfig(), wd)
 	sessionDir := filepath.Join(wd, ".mimo", "memory", "sessions", sessionID)
 
 	state := &context.CheckpointState{
@@ -105,12 +103,8 @@ func (a *App) maybeCreateAutoCheckpoint(sessionID string) error {
 		return nil
 	}
 
-	checkpointCfg := context.DefaultCheckpointConfig()
+	checkpointCfg := a.checkpointRuntimeConfig()
 	maxTokens := checkpointCfg.ContextBudget
-	if a.cfg != nil && a.cfg.Context.MaxTokens > 0 {
-		maxTokens = a.cfg.Context.MaxTokens
-		checkpointCfg.ContextBudget = maxTokens
-	}
 
 	_, messages, err := a.sessionStore.LoadSession(sessionID)
 	if err != nil {
@@ -140,6 +134,39 @@ func (a *App) maybeCreateAutoCheckpoint(sessionID string) error {
 	}
 
 	return a.pruneCheckpoints(sessionID, checkpointCfg.MaxCheckpoints)
+}
+
+func (a *App) checkpointRuntimeConfig() context.CheckpointConfig {
+	cfg := context.DefaultCheckpointConfig()
+	if a.cfg == nil {
+		return cfg
+	}
+
+	if checkpointConfigIsSet(a.cfg.Checkpoint) {
+		checkpointCfg := a.cfg.Checkpoint
+		cfg.AutoCheckpoint = checkpointCfg.AutoCheckpoint
+		cfg.ReconstructOnResume = checkpointCfg.ReconstructOnResume
+		if checkpointCfg.TokenThreshold > 0 {
+			cfg.TokenThreshold = checkpointCfg.TokenThreshold
+		}
+		if checkpointCfg.MaxCheckpoints > 0 {
+			cfg.MaxCheckpoints = checkpointCfg.MaxCheckpoints
+		}
+		if checkpointCfg.ContextBudget > 0 {
+			cfg.ContextBudget = checkpointCfg.ContextBudget
+		}
+	} else if a.cfg.Context.MaxTokens > 0 {
+		cfg.ContextBudget = a.cfg.Context.MaxTokens
+	}
+	return cfg
+}
+
+func checkpointConfigIsSet(cfg iconfig.CheckpointConfig) bool {
+	return cfg.AutoCheckpoint ||
+		cfg.TokenThreshold > 0 ||
+		cfg.MaxCheckpoints > 0 ||
+		cfg.ReconstructOnResume ||
+		cfg.ContextBudget > 0
 }
 
 func (a *App) pruneCheckpoints(sessionID string, maxCheckpoints int) error {

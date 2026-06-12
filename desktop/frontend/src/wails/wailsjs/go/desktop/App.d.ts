@@ -135,6 +135,8 @@ export function TaskList(arg1:string,arg2:boolean):Promise<Array<desktop.TaskInf
 
 export function TaskStart(arg1:string,arg2:string,arg3:string):Promise<desktop.TaskResult>;
 
+export function UpdateAdvancedSettings(arg1:desktop.AdvancedSettingsDTO):Promise<void>;
+
 export function UpdateModel(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>,arg8:string,arg9:number,arg10:number,arg11:number,arg12:boolean,arg13:boolean,arg14:boolean):Promise<void>;
 
 export function WindowClose():Promise<void>;

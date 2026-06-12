@@ -266,6 +266,10 @@ export function TaskStart(arg1, arg2, arg3) {
   return window['go']['desktop']['App']['TaskStart'](arg1, arg2, arg3);
 }
 
+export function UpdateAdvancedSettings(arg1) {
+  return window['go']['desktop']['App']['UpdateAdvancedSettings'](arg1);
+}
+
 export function UpdateModel(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14) {
   return window['go']['desktop']['App']['UpdateModel'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14);
 }

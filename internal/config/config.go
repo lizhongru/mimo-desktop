@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"fmt"
@@ -82,15 +82,31 @@ func loadFromFile(cfg *Config, path string) error {
 		return fmt.Errorf("failed to parse config file %s: %w", path, err)
 	}
 
-	mergeConfig(cfg, &fileCfg)
+	mergeConfig(cfg, &fileCfg, yamlTopLevelKeys(data))
 	return nil
+}
+
+func yamlTopLevelKeys(data []byte) map[string]bool {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil
+	}
+	keys := make(map[string]bool)
+	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
+		return keys
+	}
+	content := root.Content[0].Content
+	for i := 0; i+1 < len(content); i += 2 {
+		keys[content[i].Value] = true
+	}
+	return keys
 }
 
 // mergeConfig merges src into dst with deep merge semantics:
 // - Scalar fields: src overrides dst only if non-zero
 // - Map fields: src entries are added to dst (existing dst keys preserved)
 // - Slice fields: if src has a non-nil slice, it replaces dst's slice
-func mergeConfig(dst, src *Config) {
+func mergeConfig(dst, src *Config, sections map[string]bool) {
 	// Scalar fields
 	if src.DefaultModel != "" {
 		dst.DefaultModel = src.DefaultModel
@@ -158,7 +174,6 @@ func mergeConfig(dst, src *Config) {
 	dst.Agent.ShowCost = src.Agent.ShowCost
 	dst.Agent.Verbose = src.Agent.Verbose
 
-
 	// MCP — merge servers
 	if src.MCP.Servers != nil {
 		if dst.MCP.Servers == nil {
@@ -177,6 +192,34 @@ func mergeConfig(dst, src *Config) {
 	}
 	if src.Context.IgnorePatterns != nil {
 		dst.Context.IgnorePatterns = src.Context.IgnorePatterns
+	}
+
+	// Memory - merge fields
+	if sections["memory"] {
+		dst.Memory.CCIndex = src.Memory.CCIndex
+		if src.Memory.SearchScoreFloor != 0 {
+			dst.Memory.SearchScoreFloor = src.Memory.SearchScoreFloor
+		}
+	}
+
+	// Checkpoint - merge fields
+	if sections["checkpoint"] {
+		dst.Checkpoint.AutoCheckpoint = src.Checkpoint.AutoCheckpoint
+		if src.Checkpoint.TokenThreshold != 0 {
+			dst.Checkpoint.TokenThreshold = src.Checkpoint.TokenThreshold
+		}
+		if src.Checkpoint.MaxCheckpoints != 0 {
+			dst.Checkpoint.MaxCheckpoints = src.Checkpoint.MaxCheckpoints
+		}
+		dst.Checkpoint.ReconstructOnResume = src.Checkpoint.ReconstructOnResume
+		if src.Checkpoint.ContextBudget != 0 {
+			dst.Checkpoint.ContextBudget = src.Checkpoint.ContextBudget
+		}
+	}
+
+	// Permission - replace rules when provided
+	if sections["permission"] && src.Permission.Rules != nil {
+		dst.Permission.Rules = src.Permission.Rules
 	}
 }
 

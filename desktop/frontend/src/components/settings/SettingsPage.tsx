@@ -22,7 +22,7 @@ import {
 import { t, td } from "../../lib/i18n";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { ModelManager, type ModelConfig } from "./ModelManager";
-import { AdvancedSettings } from "./AdvancedSettings";
+import { AdvancedSettings, type AdvancedSettingsConfig } from "./AdvancedSettings";
 
 type Tab = "general" | "advanced" | "tools" | "models" | "help";
 
@@ -54,6 +54,50 @@ interface Props {
   defaultModel: string;
 }
 
+const defaultAdvancedSettings: AdvancedSettingsConfig = {
+  checkpoint: {
+    autoCheckpoint: true,
+    tokenThreshold: 0.75,
+    maxCheckpoints: 10,
+    reconstructOnResume: true,
+    contextBudget: 128000,
+  },
+  memory: {
+    ccIndex: true,
+    searchScoreFloor: 0.15,
+  },
+  permission: {
+    read: "allow",
+    write: "ask",
+    edit: "ask",
+    bash: "ask",
+  },
+};
+
+function permissionRulesToForm(
+  rules?: Array<{ permission: string; action: string }>
+): AdvancedSettingsConfig["permission"] {
+  const result = { ...defaultAdvancedSettings.permission };
+  for (const rule of rules || []) {
+    if (
+      rule.permission === "read" ||
+      rule.permission === "write" ||
+      rule.permission === "edit" ||
+      rule.permission === "bash"
+    ) {
+      result[rule.permission] = rule.action;
+    }
+  }
+  return result;
+}
+
+function permissionFormToRules(permission: AdvancedSettingsConfig["permission"]) {
+  return Object.entries(permission).map(([key, action]) => ({
+    permission: key,
+    action,
+  }));
+}
+
 export function SettingsPage({ open, onClose, defaultModel }: Props) {
   const [tab, setTab] = useState<Tab>("general");
   const { theme, language, fontSize, setTheme, setLanguage, setFontSize } =
@@ -69,6 +113,9 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
   // Models state
   const [models, setModels] = useState<Record<string, ModelConfig>>({});
   const [currentModel, setCurrentModel] = useState(defaultModel);
+  const [advancedSettings, setAdvancedSettings] =
+    useState<AdvancedSettingsConfig>(defaultAdvancedSettings);
+  const [advancedSaving, setAdvancedSaving] = useState(false);
 
 
   useEffect(() => {
@@ -81,6 +128,11 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
       .then((cfg) => {
         setModels(cfg.models || {});
         setCurrentModel(cfg.defaultModel);
+        setAdvancedSettings({
+          checkpoint: cfg.checkpoint || defaultAdvancedSettings.checkpoint,
+          memory: cfg.memory || defaultAdvancedSettings.memory,
+          permission: permissionRulesToForm(cfg.permission?.rules),
+        });
       })
       .catch(console.error);
     window.go?.desktop?.App?.GetVersion?.()
@@ -296,8 +348,18 @@ export function SettingsPage({ open, onClose, defaultModel }: Props) {
             {/* Advanced Settings */}
             {tab === "advanced" && (
               <AdvancedSettings
+                value={advancedSettings}
+                saving={advancedSaving}
                 onSave={(config) => {
-                  console.log("Advanced settings saved:", config);
+                  setAdvancedSaving(true);
+                  window.go?.desktop?.App?.UpdateAdvancedSettings?.({
+                    checkpoint: config.checkpoint,
+                    memory: config.memory,
+                    permission: { rules: permissionFormToRules(config.permission) },
+                  })
+                    .then(() => setAdvancedSettings(config))
+                    .catch(console.error)
+                    .finally(() => setAdvancedSaving(false));
                 }}
               />
             )}

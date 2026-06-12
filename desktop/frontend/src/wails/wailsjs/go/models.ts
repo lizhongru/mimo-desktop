@@ -66,6 +66,120 @@ export namespace desktop {
 		    return a;
 		}
 	}
+	export class PermissionRuleDTO {
+	    permission: string;
+	    action: string;
+	    pattern?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new PermissionRuleDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.permission = source["permission"];
+	        this.action = source["action"];
+	        this.pattern = source["pattern"];
+	    }
+	}
+	export class PermissionSettingsDTO {
+	    rules: PermissionRuleDTO[];
+
+	    static createFrom(source: any = {}) {
+	        return new PermissionSettingsDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rules = this.convertValues(source["rules"], PermissionRuleDTO);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CheckpointSettingsDTO {
+	    autoCheckpoint: boolean;
+	    tokenThreshold: number;
+	    maxCheckpoints: number;
+	    reconstructOnResume: boolean;
+	    contextBudget: number;
+
+	    static createFrom(source: any = {}) {
+	        return new CheckpointSettingsDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoCheckpoint = source["autoCheckpoint"];
+	        this.tokenThreshold = source["tokenThreshold"];
+	        this.maxCheckpoints = source["maxCheckpoints"];
+	        this.reconstructOnResume = source["reconstructOnResume"];
+	        this.contextBudget = source["contextBudget"];
+	    }
+	}
+	export class MemorySettingsDTO {
+	    ccIndex: boolean;
+	    searchScoreFloor: number;
+
+	    static createFrom(source: any = {}) {
+	        return new MemorySettingsDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ccIndex = source["ccIndex"];
+	        this.searchScoreFloor = source["searchScoreFloor"];
+	    }
+	}
+	export class AdvancedSettingsDTO {
+	    memory: MemorySettingsDTO;
+	    checkpoint: CheckpointSettingsDTO;
+	    permission: PermissionSettingsDTO;
+
+	    static createFrom(source: any = {}) {
+	        return new AdvancedSettingsDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.memory = this.convertValues(source["memory"], MemorySettingsDTO);
+	        this.checkpoint = this.convertValues(source["checkpoint"], CheckpointSettingsDTO);
+	        this.permission = this.convertValues(source["permission"], PermissionSettingsDTO);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AgentConfigInfo {
 	    name: string;
 	    mode: string;
@@ -200,6 +314,9 @@ export namespace desktop {
 	    models: Record<string, ModelDTO>;
 	    safety: SafetyDTO;
 	    agent: AgentDTO;
+	    memory: MemorySettingsDTO;
+	    checkpoint: CheckpointSettingsDTO;
+	    permission: PermissionSettingsDTO;
 
 	    static createFrom(source: any = {}) {
 	        return new AppConfigDTO(source);
@@ -214,6 +331,9 @@ export namespace desktop {
 	        this.models = this.convertValues(source["models"], ModelDTO, true);
 	        this.safety = this.convertValues(source["safety"], SafetyDTO);
 	        this.agent = this.convertValues(source["agent"], AgentDTO);
+	        this.memory = this.convertValues(source["memory"], MemorySettingsDTO);
+	        this.checkpoint = this.convertValues(source["checkpoint"], CheckpointSettingsDTO);
+	        this.permission = this.convertValues(source["permission"], PermissionSettingsDTO);
 	    }
 
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -313,6 +433,7 @@ export namespace desktop {
 	        this.id = source["id"];
 	    }
 	}
+
 	export class DreamResult {
 	    success: boolean;
 	    message: string;
@@ -422,6 +543,9 @@ export namespace desktop {
 	        this.type = source["type"];
 	    }
 	}
+
+
+
 
 
 	export class SessionDTO {
