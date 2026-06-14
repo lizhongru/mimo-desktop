@@ -38,6 +38,72 @@ func DefaultRuleset() Ruleset {
 	}
 }
 
+// PermissionForTool maps a concrete tool name to the permission category used
+// by runtime rules.
+func PermissionForTool(tool string) string {
+	switch tool {
+	case "file_read", "dir_list", "search", "glob",
+		"git_status", "git_diff", "git_log",
+		"web_fetch", "web_search":
+		return "read"
+	case "file_write", "file_delete", "dir_create", "clipboard":
+		return "write"
+	case "file_edit", "file_diff":
+		return "edit"
+	case "shell", "process":
+		return "bash"
+	}
+
+	lower := strings.ToLower(tool)
+	switch {
+	case strings.Contains(lower, "__read") ||
+		strings.Contains(lower, "__list") ||
+		strings.Contains(lower, "__search") ||
+		strings.Contains(lower, "__fetch") ||
+		strings.Contains(lower, "__get"):
+		return "read"
+	case strings.Contains(lower, "__write") ||
+		strings.Contains(lower, "__create") ||
+		strings.Contains(lower, "__delete") ||
+		strings.Contains(lower, "__save"):
+		return "write"
+	case strings.Contains(lower, "__edit") ||
+		strings.Contains(lower, "__patch") ||
+		strings.Contains(lower, "__diff"):
+		return "edit"
+	case strings.Contains(lower, "__shell") ||
+		strings.Contains(lower, "__command") ||
+		strings.Contains(lower, "__exec") ||
+		strings.Contains(lower, "__process"):
+		return "bash"
+	default:
+		return tool
+	}
+}
+
+// RulesetFromConfig normalizes persisted rules for runtime enforcement.
+// Invalid entries are ignored; if none remain, defaults are used.
+func RulesetFromConfig(rules []PermissionRule) Ruleset {
+	result := make(Ruleset, 0, len(rules))
+	for _, rule := range rules {
+		if strings.TrimSpace(rule.Permission) == "" {
+			continue
+		}
+		switch rule.Action {
+		case Allow, Deny, Ask:
+			result = append(result, PermissionRule{
+				Permission: strings.TrimSpace(rule.Permission),
+				Action:     rule.Action,
+				Pattern:    strings.TrimSpace(rule.Pattern),
+			})
+		}
+	}
+	if len(result) == 0 {
+		return DefaultRuleset()
+	}
+	return result
+}
+
 // Evaluate evaluates whether a tool action is allowed
 func (r Ruleset) Evaluate(tool string, params map[string]interface{}) PermissionAction {
 	// Find matching rule

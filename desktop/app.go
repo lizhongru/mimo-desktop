@@ -113,6 +113,8 @@ func NewApp() (*App, error) {
 	)
 	guardrail := safety.NewGuardrail(safetyLevel, classifier, c.Safety.AuditLog)
 	guardrail.SetPermission(c.Agent.Permission)
+	guardrail.SetRuleset(permissionRulesetFromConfig(c.Permission.Rules))
+	guardrail.SetWorkspaceRoot(wd)
 	a.guardrail = guardrail
 
 	// 8. Context manager

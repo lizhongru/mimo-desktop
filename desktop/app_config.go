@@ -9,6 +9,7 @@ import (
 	"github.com/mimo-cli/mimo-cli/internal/agent"
 	iconfig "github.com/mimo-cli/mimo-cli/internal/config"
 	"github.com/mimo-cli/mimo-cli/internal/llm"
+	"github.com/mimo-cli/mimo-cli/internal/permission"
 	"github.com/mimo-cli/mimo-cli/internal/safety"
 )
 
@@ -199,6 +200,18 @@ func permissionRulesFromDTO(rules []PermissionRuleDTO) []iconfig.PermissionRuleC
 	return result
 }
 
+func permissionRulesetFromConfig(rules []iconfig.PermissionRuleConfig) permission.Ruleset {
+	converted := make([]permission.PermissionRule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, permission.PermissionRule{
+			Permission: rule.Permission,
+			Action:     permission.PermissionAction(rule.Action),
+			Pattern:    rule.Pattern,
+		})
+	}
+	return permission.RulesetFromConfig(converted)
+}
+
 // SetTheme changes the theme and saves config.
 func (a *App) SetTheme(theme string) error {
 	a.cfg.Theme = theme
@@ -312,6 +325,7 @@ func (a *App) SetSafetyLevel(level string) error {
 	)
 	a.guardrail = safety.NewGuardrail(safety.SafetyLevel(level), classifier, a.cfg.Safety.AuditLog)
 	a.guardrail.SetPermission(a.cfg.Agent.Permission)
+	a.guardrail.SetRuleset(permissionRulesetFromConfig(a.cfg.Permission.Rules))
 	a.registerConfirmCallback()
 	return iconfig.SaveUserConfig(a.cfg)
 }
@@ -359,6 +373,9 @@ func (a *App) UpdateAdvancedSettings(settings AdvancedSettingsDTO) error {
 	}
 	a.cfg.Permission = iconfig.PermissionConfig{
 		Rules: permissionRulesFromDTO(settings.Permission.Rules),
+	}
+	if a.guardrail != nil {
+		a.guardrail.SetRuleset(permissionRulesetFromConfig(a.cfg.Permission.Rules))
 	}
 	return iconfig.SaveUserConfig(a.cfg)
 }

@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mimo-cli/mimo-cli/internal/permission"
 )
 
 // SafetyLevel defines the overall safety mode
@@ -23,22 +26,48 @@ type Guardrail struct {
 	classifier *Classifier
 	auditLog   *AuditLog
 	confirmFn  func(action Action) (bool, error) // Callback for confirmation
-	permission string                              // readonly, write, exec
+	permission string                            // readonly, write, exec
+	ruleset    permission.Ruleset
+	workspace  string
 }
 
 // NewGuardrail creates a new safety guardrail
 func NewGuardrail(level SafetyLevel, classifier *Classifier, auditLogPath string) *Guardrail {
+	wd, _ := os.Getwd()
 	return &Guardrail{
 		level:      level,
 		classifier: classifier,
 		auditLog:   NewAuditLog(auditLogPath),
 		permission: "exec", // default: allow all
+		ruleset:    permission.DefaultRuleset(),
+		workspace:  wd,
 	}
 }
 
 // SetPermission sets the permission level (readonly, write, exec)
 func (g *Guardrail) SetPermission(p string) {
 	g.permission = p
+}
+
+// SetRuleset sets the runtime permission rules used before safety checks.
+func (g *Guardrail) SetRuleset(ruleset permission.Ruleset) {
+	if len(ruleset) == 0 {
+		g.ruleset = permission.DefaultRuleset()
+		return
+	}
+	g.ruleset = ruleset
+}
+
+// SetWorkspaceRoot sets the directory used for external_directory checks.
+func (g *Guardrail) SetWorkspaceRoot(root string) {
+	if root == "" {
+		return
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		g.workspace = filepath.Clean(abs)
+		return
+	}
+	g.workspace = filepath.Clean(root)
 }
 
 // SetConfirmCallback sets the callback for confirmation dialogs
@@ -57,6 +86,10 @@ func (g *Guardrail) Check(toolName string, params map[string]interface{}) (bool,
 
 	// Log the action
 	g.auditLog.Log(action)
+
+	if err := g.checkRuleset(action, false); err != nil {
+		return false, err
+	}
 
 	switch action.Level {
 	case ActionCritical:
@@ -100,6 +133,10 @@ func (g *Guardrail) CheckWithConfirmAll(toolName string, params map[string]inter
 	// Log the action
 	g.auditLog.Log(action)
 
+	if err := g.checkRuleset(action, confirmAll); err != nil {
+		return false, err
+	}
+
 	switch action.Level {
 	case ActionCritical:
 		return false, fmt.Errorf("CRITICAL: operation blocked — %s", action.Description)
@@ -131,6 +168,87 @@ func (g *Guardrail) CheckWithConfirmAll(toolName string, params map[string]inter
 	}
 
 	return true, nil
+}
+
+func (g *Guardrail) checkRuleset(action Action, confirmAll bool) error {
+	category := permission.PermissionForTool(action.Tool)
+	if category == "" {
+		category = action.Tool
+	}
+
+	if g.hasExternalPath(action.Params) {
+		if err := g.checkPermissionDecision("external_directory", action, confirmAll); err != nil {
+			return err
+		}
+	}
+
+	return g.checkPermissionDecision(category, action, confirmAll)
+}
+
+func (g *Guardrail) checkPermissionDecision(category string, action Action, confirmAll bool) error {
+	decision := g.ruleset.Evaluate(category, action.Params)
+	switch decision {
+	case permission.Allow:
+		return nil
+	case permission.Deny:
+		return fmt.Errorf("permission %s denied tool %s", category, action.Tool)
+	case permission.Ask:
+		if confirmAll {
+			return nil
+		}
+		allowed, err := g.confirmAction(action)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("permission %s declined for tool %s", category, action.Tool)
+		}
+		return nil
+	default:
+		return fmt.Errorf("permission %s has invalid action %q for tool %s", category, decision, action.Tool)
+	}
+}
+
+func (g *Guardrail) hasExternalPath(params map[string]interface{}) bool {
+	if len(params) == 0 {
+		return false
+	}
+	for _, key := range []string{"path", "file_path", "path_a", "path_b", "dir", "directory"} {
+		value, ok := params[key].(string)
+		if !ok || value == "" {
+			continue
+		}
+		if g.isExternalPath(value) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Guardrail) isExternalPath(path string) bool {
+	workspace := g.workspace
+	if workspace == "" {
+		workspace, _ = os.Getwd()
+	}
+	workspaceAbs, err := filepath.Abs(workspace)
+	if err != nil {
+		return false
+	}
+
+	target := path
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(workspaceAbs, target)
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return false
+	}
+
+	rel, err := filepath.Rel(filepath.Clean(workspaceAbs), filepath.Clean(targetAbs))
+	if err != nil {
+		return true
+	}
+	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // confirmAction asks the user for confirmation

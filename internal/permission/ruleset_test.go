@@ -101,3 +101,57 @@ func TestSaveAndLoadRuleset(t *testing.T) {
 		t.Errorf("expected 2 rules, got %d", len(loaded))
 	}
 }
+
+func TestPermissionForToolMapsCoreTools(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"file_read", "read"},
+		{"dir_list", "read"},
+		{"search", "read"},
+		{"glob", "read"},
+		{"git_status", "read"},
+		{"file_write", "write"},
+		{"file_delete", "write"},
+		{"dir_create", "write"},
+		{"file_edit", "edit"},
+		{"file_diff", "edit"},
+		{"shell", "bash"},
+		{"process", "bash"},
+	}
+
+	for _, tt := range tests {
+		if got := PermissionForTool(tt.name); got != tt.want {
+			t.Fatalf("PermissionForTool(%q) = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestRulesetFromConfigUsesDefaultsWhenRulesAreInvalid(t *testing.T) {
+	ruleset := RulesetFromConfig([]PermissionRule{
+		{Permission: "bash", Action: "launch"},
+		{Permission: "", Action: Deny},
+	})
+
+	if got := ruleset.Evaluate("read", nil); got != Allow {
+		t.Fatalf("read action = %q, want default %q", got, Allow)
+	}
+	if got := ruleset.Evaluate("bash", nil); got != Ask {
+		t.Fatalf("bash action = %q, want default %q", got, Ask)
+	}
+}
+
+func TestRulesetFromConfigKeepsValidRules(t *testing.T) {
+	ruleset := RulesetFromConfig([]PermissionRule{
+		{Permission: "bash", Action: Deny},
+		{Permission: "write", Action: Allow, Pattern: "/tmp/*"},
+	})
+
+	if got := ruleset.Evaluate("bash", nil); got != Deny {
+		t.Fatalf("bash action = %q, want %q", got, Deny)
+	}
+	if got := ruleset.Evaluate("write", map[string]interface{}{"path": "/tmp/file.txt"}); got != Allow {
+		t.Fatalf("write action = %q, want %q", got, Allow)
+	}
+}

@@ -6,11 +6,14 @@ import (
 	"testing"
 
 	"github.com/mimo-cli/mimo-cli/internal/llm"
+	"github.com/mimo-cli/mimo-cli/internal/permission"
+	"github.com/mimo-cli/mimo-cli/internal/safety"
 	"github.com/mimo-cli/mimo-cli/internal/tools"
 )
 
 type allowlistTestTool struct {
-	name string
+	name     string
+	executed *bool
 }
 
 func (t allowlistTestTool) Name() string { return t.name }
@@ -24,6 +27,9 @@ func (t allowlistTestTool) Parameters() map[string]interface{} {
 }
 
 func (t allowlistTestTool) Execute(context.Context, map[string]interface{}) (*tools.ToolResult, error) {
+	if t.executed != nil {
+		*t.executed = true
+	}
 	return &tools.ToolResult{Output: "ran " + t.name}, nil
 }
 
@@ -67,5 +73,33 @@ func TestExecuteToolCallRejectsDisallowedTool(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("executeToolCall error = %q, want not allowed", err.Error())
+	}
+}
+
+func TestExecuteToolCallRejectsDeniedPermissionBeforeExecution(t *testing.T) {
+	executed := false
+	registry := tools.NewRegistry()
+	registry.Register(allowlistTestTool{name: "shell", executed: &executed})
+
+	guardrail := safety.NewGuardrail(safety.LevelAuto, safety.NewClassifier(nil, nil, nil), "")
+	guardrail.SetRuleset(permission.Ruleset{
+		{Permission: "bash", Action: permission.Deny},
+	})
+	a := &Agent{registry: registry, guardrail: guardrail}
+
+	_, err := a.executeToolCall(context.Background(), llm.ToolCall{
+		Function: llm.FunctionCall{
+			Name:      "shell",
+			Arguments: `{"command":"echo hello"}`,
+		},
+	})
+	if err == nil {
+		t.Fatal("executeToolCall returned nil error for denied permission")
+	}
+	if !strings.Contains(err.Error(), "permission bash denied") {
+		t.Fatalf("executeToolCall error = %q, want permission bash denied", err.Error())
+	}
+	if executed {
+		t.Fatal("tool executed despite denied permission")
 	}
 }
