@@ -162,6 +162,7 @@ export default function App() {
 
     if (sid && useChatStore.getState().messages.length === 0) {
       await window.go?.desktop?.App?.MoveSession?.(sid, ws);
+      sessStore.updateSessionWorkspace(sid, ws);
     }
 
     if (!sessStore.sessions.find((s) => s.id === sid)) {
@@ -194,11 +195,24 @@ export default function App() {
   const handleNewChat = useCallback(() => {
     const ws = useSessionStore.getState().selectedWorkspace || DEFAULT_WS;
     window.go?.desktop?.App?.CreateNewSession?.(ws).then((id) => {
-      useSessionStore.getState().setCurrentSessionId(id);
+      const sessStore = useSessionStore.getState();
+      const now = new Date().toISOString();
+      sessStore.setCurrentSessionId(id);
+      if (!sessStore.sessions.some((session) => session.id === id)) {
+        sessStore.addSession({
+          id,
+          workspaceId: ws,
+          modelName: currentModel,
+          userName: "",
+          lastMessage: "",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
       useChatStore.getState().clearMessages();
       useActivityStore.getState().clear();
     }).catch(console.error);
-  }, []);
+  }, [currentModel]);
 
   // Load existing session — restore workspace from backend
   const handleLoadSession = useCallback((id: string) => {
@@ -238,13 +252,18 @@ export default function App() {
     sessStore.setSelectedWorkspace(workspaceId);
     if (sessStore.currentSessionId && !hasMessages) {
       await window.go?.desktop?.App?.MoveSession?.(sessStore.currentSessionId, workspaceId);
+      sessStore.updateSessionWorkspace(sessStore.currentSessionId, workspaceId);
     }
 
     // dir is a filesystem path; convert to workspace ID
     if (dir) {
       try {
         const ws = await window.go?.desktop?.App?.CreateWorkspace?.(dir);
-        useSessionStore.getState().setSelectedWorkspace(ws.id);
+        const nextStore = useSessionStore.getState();
+        nextStore.setSelectedWorkspace(ws.id);
+        if (nextStore.currentSessionId && !hasMessages) {
+          nextStore.updateSessionWorkspace(nextStore.currentSessionId, ws.id);
+        }
         // Refresh workspaces list
         const list = await window.go?.desktop?.App?.ListWorkspaces?.();
         useSessionStore.getState().setWorkspaces(list || []);

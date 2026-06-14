@@ -182,7 +182,7 @@ export function AppLayout({
         {/* Left Sidebar */}
         <div
           className={`border-r border-bdr bg-sidebar transition-all duration-200 flex-shrink-0 overflow-hidden relative z-10 ${
-            leftOpen ? "w-[260px]" : "w-0"
+            leftOpen ? "w-[284px]" : "w-0"
           }`}
         >
           {leftOpen && (

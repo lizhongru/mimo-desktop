@@ -1,5 +1,5 @@
 export namespace desktop {
-
+	
 	export class ActorInfo {
 	    id: string;
 	    type: string;
@@ -12,11 +12,11 @@ export namespace desktop {
 	    created_at: number;
 	    started_at?: number;
 	    completed_at?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ActorInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -36,18 +36,18 @@ export namespace desktop {
 	    success: boolean;
 	    message: string;
 	    actor?: ActorInfo;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ActorResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.message = source["message"];
 	        this.actor = this.convertValues(source["actor"], ActorInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -70,11 +70,11 @@ export namespace desktop {
 	    permission: string;
 	    action: string;
 	    pattern?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PermissionRuleDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.permission = source["permission"];
@@ -84,16 +84,16 @@ export namespace desktop {
 	}
 	export class PermissionSettingsDTO {
 	    rules: PermissionRuleDTO[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PermissionSettingsDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rules = this.convertValues(source["rules"], PermissionRuleDTO);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -118,11 +118,11 @@ export namespace desktop {
 	    maxCheckpoints: number;
 	    reconstructOnResume: boolean;
 	    contextBudget: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CheckpointSettingsDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.autoCheckpoint = source["autoCheckpoint"];
@@ -135,11 +135,11 @@ export namespace desktop {
 	export class MemorySettingsDTO {
 	    ccIndex: boolean;
 	    searchScoreFloor: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemorySettingsDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ccIndex = source["ccIndex"];
@@ -150,18 +150,18 @@ export namespace desktop {
 	    memory: MemorySettingsDTO;
 	    checkpoint: CheckpointSettingsDTO;
 	    permission: PermissionSettingsDTO;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AdvancedSettingsDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.memory = this.convertValues(source["memory"], MemorySettingsDTO);
 	        this.checkpoint = this.convertValues(source["checkpoint"], CheckpointSettingsDTO);
 	        this.permission = this.convertValues(source["permission"], PermissionSettingsDTO);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -187,11 +187,11 @@ export namespace desktop {
 	    description: string;
 	    prompt: string;
 	    tool_allowlist?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AgentConfigInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -208,11 +208,11 @@ export namespace desktop {
 	    permission: string;
 	    reasoningLevel: string;
 	    showTokenUsage: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AgentDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.maxIterations = source["maxIterations"];
@@ -226,18 +226,18 @@ export namespace desktop {
 	    success: boolean;
 	    message: string;
 	    agent?: AgentConfigInfo;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AgentSwitchResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.message = source["message"];
 	        this.agent = this.convertValues(source["agent"], AgentConfigInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -259,11 +259,11 @@ export namespace desktop {
 	export class SafetyDTO {
 	    level: string;
 	    permission: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SafetyDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.level = source["level"];
@@ -284,11 +284,11 @@ export namespace desktop {
 	    streaming: boolean;
 	    vision: boolean;
 	    tools: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
@@ -317,11 +317,11 @@ export namespace desktop {
 	    memory: MemorySettingsDTO;
 	    checkpoint: CheckpointSettingsDTO;
 	    permission: PermissionSettingsDTO;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppConfigDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultModel = source["defaultModel"];
@@ -335,7 +335,7 @@ export namespace desktop {
 	        this.checkpoint = this.convertValues(source["checkpoint"], CheckpointSettingsDTO);
 	        this.permission = this.convertValues(source["permission"], PermissionSettingsDTO);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -362,11 +362,11 @@ export namespace desktop {
 	    tokens: number;
 	    toolCalls: number;
 	    durationMs: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ChatMessageDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.role = source["role"];
@@ -385,11 +385,11 @@ export namespace desktop {
 	    message_offset: number;
 	    // Go type: time
 	    created_at: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CheckpointInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -398,7 +398,7 @@ export namespace desktop {
 	        this.message_offset = source["message_offset"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -421,11 +421,11 @@ export namespace desktop {
 	    success: boolean;
 	    message: string;
 	    id?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CheckpointResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -433,16 +433,16 @@ export namespace desktop {
 	        this.id = source["id"];
 	    }
 	}
-
+	
 	export class DreamResult {
 	    success: boolean;
 	    message: string;
 	    count: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DreamResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -453,11 +453,11 @@ export namespace desktop {
 	export class ExportMessage {
 	    role: string;
 	    content: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ExportMessage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.role = source["role"];
@@ -469,11 +469,11 @@ export namespace desktop {
 	    connected: boolean;
 	    toolCount: number;
 	    tools: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -489,11 +489,11 @@ export namespace desktop {
 	    // Go type: time
 	    updatedAt: any;
 	    scope: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemoryFileInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -502,7 +502,7 @@ export namespace desktop {
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
 	        this.scope = source["scope"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -528,11 +528,11 @@ export namespace desktop {
 	    scope: string;
 	    scope_id: string;
 	    type: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemorySearchResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -543,11 +543,11 @@ export namespace desktop {
 	        this.type = source["type"];
 	    }
 	}
-
-
-
-
-
+	
+	
+	
+	
+	
 	export class SessionDTO {
 	    id: string;
 	    workspaceId: string;
@@ -556,11 +556,11 @@ export namespace desktop {
 	    lastMessage: string;
 	    createdAt: string;
 	    updatedAt: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SessionDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -577,11 +577,11 @@ export namespace desktop {
 	    workspaceId: string;
 	    modelName: string;
 	    messages: ChatMessageDTO[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SessionData(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -589,7 +589,7 @@ export namespace desktop {
 	        this.modelName = source["modelName"];
 	        this.messages = this.convertValues(source["messages"], ChatMessageDTO);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -614,11 +614,11 @@ export namespace desktop {
 	    confidence: number;
 	    pattern?: string;
 	    commands?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillCandidateInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -634,11 +634,11 @@ export namespace desktop {
 	    at: number;
 	    kind: string;
 	    summary?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new TaskEventInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -658,11 +658,11 @@ export namespace desktop {
 	    created_at: number;
 	    last_event_at: number;
 	    ended_at?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new TaskInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -680,18 +680,18 @@ export namespace desktop {
 	    success: boolean;
 	    message: string;
 	    task?: TaskInfo;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new TaskResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.message = source["message"];
 	        this.task = this.convertValues(source["task"], TaskInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -716,11 +716,11 @@ export namespace desktop {
 	    safetyLevel: string;
 	    isMcp: boolean;
 	    serverName?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -735,11 +735,11 @@ export namespace desktop {
 	    name: string;
 	    type: string;
 	    path: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -752,7 +752,7 @@ export namespace desktop {
 }
 
 export namespace llm {
-
+	
 	export class ModelInfo {
 	    id: string;
 	    owned_by?: string;
@@ -760,11 +760,11 @@ export namespace llm {
 	    context_window?: number;
 	    max_output?: number;
 	    capabilities?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];

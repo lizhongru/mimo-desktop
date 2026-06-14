@@ -24,15 +24,15 @@ import {
   Database,
   History,
   ListTodo,
-  Bot
+  Bot,
+  Search,
 } from "lucide-react";
-import { useSessionStore, type SessionItem, type WorkspaceItem } from "../../stores/sessionStore";
+import { useSessionStore, type SessionItem } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { t } from "../../lib/i18n";
 import { ShortcutsPanel } from "../common/ShortcutsPanel";
 import { HelpLogPanel } from "../common/HelpLogPanel";
 import { AboutPanel } from "../common/AboutPanel";
-import { animateThemeSwitch } from "../../lib/theme-transition";
 
 interface Props {
   onNewChat: () => void;
@@ -75,10 +75,9 @@ function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + "..." : str;
 }
 
-function getDirName(path: string): string {
-  if (!path) return "其他";
-  const parts = path.replace(/\\/g, "/").split("/");
-  return parts[parts.length - 1] || path;
+function sessionTitle(session: SessionItem): string {
+  const title = session.lastMessage?.trim();
+  return title ? truncate(title.replace(/\s+/g, " "), 72) : t("new_chat");
 }
 
 function ContextMenu({
@@ -173,12 +172,26 @@ function SessionItemRow({
 }) {
   return (
     <div
-      className={`group flex items-start gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors ${isActive && !isManageMode
-          ? "bg-accent/10 border-l-2 border-accent"
-          : "border-l-2 border-transparent hover:bg-elevated/40"
-        } ${isSelected ? "bg-accent/10" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-current={isActive && !isManageMode ? "page" : undefined}
+      aria-label={sessionTitle(session)}
+      className={`group relative mx-1.5 flex min-h-[38px] cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors duration-150 ${
+        isActive && !isManageMode
+          ? "bg-[var(--sidebar-item-active)] text-txt shadow-[inset_2px_0_0_rgba(196,136,112,0.95)]"
+          : "text-txt-2 hover:bg-[var(--sidebar-item-hover)]"
+      } ${isSelected ? "bg-[var(--sidebar-accent-soft)] shadow-[inset_2px_0_0_rgba(196,136,112,0.75)]" : ""}`}
       onClick={(e) => {
         e.stopPropagation();
+        if (isManageMode) {
+          onToggleSelect(session.id);
+        } else {
+          onLoad(session.id);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
         if (isManageMode) {
           onToggleSelect(session.id);
         } else {
@@ -188,7 +201,7 @@ function SessionItemRow({
       onContextMenu={(e) => onContextMenu(e, session.id)}
     >
       {isManageMode ? (
-        <div className="flex-shrink-0 mt-0.5">
+        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md">
           {isSelected ? (
             <SquareCheck className="w-4 h-4 text-accent" />
           ) : (
@@ -196,15 +209,27 @@ function SessionItemRow({
           )}
         </div>
       ) : (
-        <MessageSquare className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isActive ? "text-accent" : "text-txt-g"}`} />
+        <div
+          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-colors ${
+            isActive
+              ? "text-accent"
+              : "text-txt-g group-hover:text-txt-2"
+          }`}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+        </div>
       )}
-      <div className="flex-1 min-w-0">
-        <div className={`text-sm truncate ${isActive ? "text-accent" : "text-txt"}`}>
-          {truncate(session.lastMessage, 35)}
+      <div className="flex min-w-0 flex-1 items-center gap-2 pr-7">
+        <div className="min-w-0 flex-1 leading-none">
+          <div className={`truncate text-[13px] font-medium ${isActive && !isManageMode ? "text-txt" : "text-txt-2"}`}>
+            {sessionTitle(session)}
+          </div>
         </div>
-        <div className="text-[10px] text-txt-m mt-0.5">
-          {formatDate(session.updatedAt)}
-        </div>
+        {!isManageMode && (
+          <span className="flex-shrink-0 text-[10px] text-txt-g transition-opacity group-hover:opacity-0">
+            {formatDate(session.updatedAt)}
+          </span>
+        )}
       </div>
       {!isManageMode && (
         <button
@@ -212,9 +237,10 @@ function SessionItemRow({
             e.stopPropagation();
             onDelete(session.id);
           }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-txt-g transition-all cursor-pointer"
+          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-txt-g opacity-0 transition-colors duration-150 hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100 cursor-pointer"
+          aria-label={t("delete")}
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
     </div>
@@ -233,6 +259,7 @@ export function LeftSidebar({
 }: Props) {
   const sessions = useSessionStore((s) => s.sessions);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
+  const selectedWorkspace = useSessionStore((s) => s.selectedWorkspace);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const workspaces = useSessionStore((s) => s.workspaces);
   const [defaultExpanded, setDefaultExpanded] = useState(true);
@@ -241,24 +268,27 @@ export function LeftSidebar({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pinnedDirs, setPinnedDirs] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [helpLogOpen, setHelpLogOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [langPanelOpen, setLangPanelOpen] = useState(false);
-  const theme = useSettingsStore((s) => s.theme);
-  const language = useSettingsStore((s) => s.language);
-  const setTheme = useSettingsStore((s) => s.setTheme);
-  const setLanguage = useSettingsStore((s) => s.setLanguage);
+  const [sessionQuery, setSessionQuery] = useState("");
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
-    // Workspaces are loaded in App.tsx on mount
+    const activeWorkspace =
+      sessions.find((session) => session.id === currentSessionId)?.workspaceId ||
+      selectedWorkspace;
 
+    if (!activeWorkspace || activeWorkspace === "default") {
+      if (activeWorkspace === "default") setDefaultExpanded(true);
+      return;
+    }
 
-
-  }, []);
+    setExpandedWorkspaceIds((prev) => {
+      if (prev.has(activeWorkspace)) return prev;
+      const next = new Set(prev);
+      next.add(activeWorkspace);
+      return next;
+    });
+  }, [currentSessionId, selectedWorkspace, sessions]);
 
   // Close context menu on escape
   useEffect(() => {
@@ -344,7 +374,16 @@ export function LeftSidebar({
   // Group sessions by workspace
   const workspaceGroups = new Map<string, SessionItem[]>();
 
-  for (const session of sessions) {
+  const normalizedQuery = sessionQuery.trim().toLowerCase();
+  const visibleSessions = normalizedQuery
+    ? sessions.filter((session) =>
+        `${session.lastMessage} ${session.modelName} ${session.userName}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      )
+    : sessions;
+
+  for (const session of visibleSessions) {
     const wsId = session.workspaceId || "default";
     if (!workspaceGroups.has(wsId)) workspaceGroups.set(wsId, []);
     workspaceGroups.get(wsId)!.push(session);
@@ -399,21 +438,20 @@ export function LeftSidebar({
 
   const renderWorkspaceGroup = (wsId: string, dirSessions: SessionItem[], expanded: boolean, onToggle: () => void) => {
     const isPinned = pinnedDirs.has(wsId);
-    const wsManage = manageMode && selectedIds.size > 0;
     const GroupIcon = wsId === "default" ? MessageSquare : FolderOpen;
 
     return (
-      <div key={wsId} className="mb-1">
+      <div key={wsId} className="mb-1.5">
         <button
           onClick={onToggle}
           onContextMenu={(e) => handleWorkspaceContextMenu(e, wsId)}
-          className={`flex items-center gap-1.5 px-4 py-1.5 text-[10px] uppercase tracking-wider w-full transition-colors cursor-pointer ${isPinned ? "text-accent" : "text-txt-m hover:text-txt-g"
+          className={`flex min-h-[28px] w-full items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer ${isPinned ? "text-accent" : "text-txt-m hover:bg-[var(--sidebar-item-hover)] hover:text-txt-2"
             }`}
         >
-          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "" : "-rotate-90"}`} />
-          <GroupIcon className="w-3 h-3" />
+          <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+          <GroupIcon className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{getWorkspaceName(wsId)}</span>
-          {isPinned && <Pin className="w-2.5 h-2.5 ml-0.5" />}
+          {isPinned && <Pin className="w-2.5 h-2.5 flex-shrink-0" />}
           {manageMode && (
             <button
               onClick={(e) => {
@@ -427,7 +465,8 @@ export function LeftSidebar({
                   return next;
                 });
               }}
-              className="ml-auto text-txt-g hover:text-accent cursor-pointer"
+              className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-txt-g hover:bg-accent/10 hover:text-accent cursor-pointer"
+              aria-label={t("manage")}
             >
               {dirSessions.every((s) => selectedIds.has(s.id)) ? (
                 <SquareCheck className="w-3 h-3 text-accent" />
@@ -437,25 +476,32 @@ export function LeftSidebar({
             </button>
           )}
           {!manageMode && (
-            <span className="ml-auto text-txt-g">{dirSessions.length}</span>
+            <span className="ml-auto text-[10px] font-medium text-txt-g">{dirSessions.length}</span>
           )}
         </button>
-        {expanded && dirSessions.map(renderSessionRow)}
+        {expanded && <div className="mt-px space-y-px">{dirSessions.map(renderSessionRow)}</div>}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-full w-[260px] relative" style={{ zIndex: 50 }}>
+    <div className="flex flex-col h-full w-[284px] relative" style={{ zIndex: 50 }}>
       {/* Header */}
-      <div className="p-3 border-b border-bdr-sub space-y-2">
-        <div className="flex items-center gap-2">
+      <div className="border-b border-bdr-sub bg-sidebar px-3 pb-3 pt-2.5">
+        <div className="mb-2.5 flex items-center gap-1.5">
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold leading-tight text-txt">{t("conversations")}</div>
+            <div className="mt-0.5 text-[10px] leading-tight text-txt-g">
+              {sessions.length === 0 ? "暂无会话" : `${sessions.length} 个会话`}
+            </div>
+          </div>
           <button
             onClick={onNewChat}
-            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-sm font-medium cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-bdr-sub bg-[var(--sidebar-control)] text-txt-2 hover:border-accent/40 hover:text-accent transition-colors cursor-pointer"
+            aria-label={t("new_chat")}
+            title={t("new_chat")}
           >
             <Plus className="w-4 h-4" />
-            {t("new_chat")}
           </button>
           <button
             onClick={() => {
@@ -466,16 +512,27 @@ export function LeftSidebar({
                 setManageMode(true);
               }
             }}
-            className={`p-2 rounded-lg transition-colors cursor-pointer ${manageMode ? "bg-accent/20 text-accent" : "bg-elevated text-txt-g hover:text-txt"
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer ${manageMode ? "bg-[var(--sidebar-accent-soft)] text-accent" : "text-txt-g hover:bg-[var(--sidebar-control-hover)] hover:text-txt"
               }`}
             title={t("manage")}
+            aria-label={t("manage")}
           >
             {manageMode ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
           </button>
         </div>
 
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-txt-g" />
+          <input
+            value={sessionQuery}
+            onChange={(e) => setSessionQuery(e.target.value)}
+            placeholder="搜索对话"
+            className="h-8 w-full rounded-lg border border-bdr-sub bg-[var(--sidebar-control)] pl-8 pr-3 text-[12px] text-txt outline-none transition-colors placeholder:text-txt-g hover:bg-[var(--sidebar-control-hover)] focus:border-accent/40"
+          />
+        </div>
+
         {manageMode && selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[var(--sidebar-control)] px-2.5 py-2 text-xs">
             <span className="text-txt-m">
               {t("selected_count")} {selectedIds.size}
             </span>
@@ -491,10 +548,35 @@ export function LeftSidebar({
       </div>
 
       {/* Session List */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto px-1.5 py-2">
         {sessions.length === 0 && (
-          <div className="px-4 py-8 text-center text-txt-m text-xs">
-            {t("no_sessions")}
+          <div className="mx-4 mt-14 text-center">
+            <div className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-bdr-sub text-txt-g">
+              <MessageSquare className="h-4 w-4" />
+            </div>
+            <div className="text-xs font-medium text-txt-2">{t("no_sessions")}</div>
+            <button
+              onClick={onNewChat}
+              className="mx-auto mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-[var(--sidebar-accent-soft)] px-3 text-xs text-accent transition-colors hover:bg-accent/20 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t("new_chat")}
+            </button>
+          </div>
+        )}
+
+        {sessions.length > 0 && visibleSessions.length === 0 && (
+          <div className="mx-4 mt-14 text-center">
+            <div className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-bdr-sub text-txt-g">
+              <Search className="h-4 w-4" />
+            </div>
+            <div className="text-xs font-medium text-txt-2">没有匹配的对话</div>
+            <button
+              onClick={() => setSessionQuery("")}
+              className="mx-auto mt-4 flex h-8 items-center rounded-lg bg-[var(--sidebar-control)] px-3 text-xs text-txt-2 transition-colors hover:text-accent cursor-pointer"
+            >
+              清除搜索
+            </button>
           </div>
         )}
 
@@ -660,13 +742,13 @@ export function LeftSidebar({
     }, [rawMenuOpen]);
 
     return (
-      <div ref={footerRef} className="relative border-t border-bdr-sub">
+      <div ref={footerRef} className="relative border-t border-bdr-sub px-2 py-2">
         <button
           onClick={() => (rawMenuOpen ? close() : openMenu())}
-          className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md hover:bg-elevated transition-colors cursor-pointer"
+          className="flex items-center gap-2.5 w-full rounded-lg px-2 py-2 hover:bg-[var(--sidebar-item-hover)] transition-colors cursor-pointer"
         >
-          <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-accent">M</span>
+          <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-semibold text-accent">M</span>
           </div>
           <div className="flex-1 min-w-0 text-left">
             <div className="text-xs font-medium text-txt truncate">MiMo User</div>

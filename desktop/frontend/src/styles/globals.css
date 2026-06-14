@@ -12,6 +12,11 @@
   --bg-surface: #ffffff;
   --bg-sidebar: #f0f0f2;
   --bg-elevated: #f0f0f3;
+  --sidebar-control: #ffffff;
+  --sidebar-control-hover: #e9e9ee;
+  --sidebar-item-active: #ffffff;
+  --sidebar-item-hover: #e7e7ec;
+  --sidebar-accent-soft: rgba(196, 136, 112, 0.12);
   --border-default: #e2e2e8;
   --border-subtle: #ececf0;
   --border-divider: #dcdce2;
@@ -27,6 +32,11 @@
   --bg-surface: #2b2b2b;
   --bg-sidebar: #141414;
   --bg-elevated: #2d2d2d;
+  --sidebar-control: #1d1d1d;
+  --sidebar-control-hover: #252525;
+  --sidebar-item-active: #242424;
+  --sidebar-item-hover: #202020;
+  --sidebar-accent-soft: rgba(196, 136, 112, 0.16);
   --border-default: #383838;
   --border-subtle: #252525;
   --border-divider: #303030;

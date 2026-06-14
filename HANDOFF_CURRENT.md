@@ -1,10 +1,10 @@
 # MiMo Desktop — 当前上下文交接
 
-> 日期：2026-06-12
+> 日期：2026-06-14
 > 工作区：`D:\works\study\mimo cli`
-> 分支：`master`
+> 当前分支：`master`
 > 远端：`origin/master`
-> 当前状态：`master` 与 `origin/master` 一致，代码改动已提交并推送；本地仅 `HANDOFF_CURRENT.md` 为本次交接刷新产生的文档改动。
+> 当前状态：本轮侧栏 UI 与工作区展开修复已完成，准备提交并推送到 `origin/master`。
 
 ---
 
@@ -17,152 +17,142 @@
 
 ---
 
-## 2. 当前提交状态
+## 2. 当前 Git 状态
 
-当前 `HEAD` 与 `origin/master` 均为：
+当前本地分支：
 
 ```text
-0bdaebc feat: auto checkpoint saved chat sessions
+master
 ```
 
-最近提交：
+提交历史顶部在本轮提交前为：
 
 ```text
+aef153e feat: enforce persisted permission rules
+7b75b8f feat: persist advanced settings
+0e55a2e docs: define advanced settings persistence
 0bdaebc feat: auto checkpoint saved chat sessions
 587f7e5 feat: apply active agent mode to chat runtime
-9c7c450 feat: add mimo integration panels and settings
-c002108 feat: wire mimo memory task actor tools
-72cacdd 更新多个文件
-```
-
-之前 GitHub 普通 DNS/SSL 有问题，如果后续需要推送，已知可用命令：
-
-```powershell
-git -c http.sslBackend=schannel -c http.curloptResolve=github.com:443:140.82.116.4 push origin master
-```
-
----
-
-## 3. 已完成并提交的工作
-
-### 3.1 前端样式统一与多 Agent 切换生效
-
-提交：
-
-```text
-587f7e5 feat: apply active agent mode to chat runtime
-```
-
-主要内容：
-
-- 统一检查点输入框、任务描述输入框、子智能体选择/提示词输入框边框样式。
-- `buildSystemPrompt` 会读取当前 Agent 配置，并把名称、模式、描述、prompt 写入 system prompt。
-- 聊天发送和 Agent 切换都会同步当前 Agent 的 `ToolAllowlist`。
-- `internal/agent` 支持工具白名单过滤，禁止未授权工具定义和执行。
-- `AgentSwitch` 返回完整 Agent 配置，不再丢 `prompt` 和 `tool_allowlist`。
-
-相关测试：
-
-- `desktop/app_multi_agent_test.go`
-- `internal/agent/agent_tool_allowlist_test.go`
-
-### 3.2 自动 checkpoint 接入保存链路
-
-提交：
-
-```text
-0bdaebc feat: auto checkpoint saved chat sessions
-```
-
-主要内容：
-
-- `SaveSessionFromFrontend` 保存消息后会调用 `maybeCreateAutoCheckpoint`。
-- 自动 checkpoint 使用当前上下文 token 预算阈值，默认遵循 `context.DefaultCheckpointConfig()`。
-- 如果 `a.cfg.Context.MaxTokens` 有值，会用该值作为 checkpoint 阈值预算。
-- 同一消息 offset 不重复创建 checkpoint。
-- checkpoint 超过默认最大数量后会修剪旧记录。
-- `RestoreCheckpoint` 会把 checkpoint summary 和 offset 之后的消息重新加载进运行中的 Agent 上下文。
-- SQLite checkpoint 仍是主存储，同时保留 `.mimo/memory/sessions/<sessionID>` 文件 checkpoint 的兼容写入。
-
-相关测试：
-
-- `desktop/app_checkpoint_test.go`
-- `internal/session/store_test.go`
-
----
-
-## 4. 当前工作区状态
-
-当前真实状态：
-
-```text
-## master...origin/master
- M HANDOFF_CURRENT.md
 ```
 
 说明：
 
-- 代码文件当前没有未提交 diff。
-- 新增测试文件已经在提交中，不再是未跟踪文件。
-- `HANDOFF_CURRENT.md` 是本次为了修正过期交接信息而修改。
+- 本地只保留 `master` 分支。
+- `aef153e feat: enforce persisted permission rules` 已在 `master` 上。
+- 本轮会新增一个侧栏 UI / 工作区展开相关提交并推送。
+- 若 GitHub HTTPS 推送再次遇到 connection reset，可用：
+
+```powershell
+git -c http.sslBackend=schannel -c http.version=HTTP/1.1 push origin master
+```
 
 ---
 
-## 5. 最近已验证
+## 3. 本轮完成内容
 
-交接前一轮已跑过：
+### 3.1 权限系统接入
 
-```powershell
-go test ./... -count=1
-cd desktop/frontend
-npx tsc --noEmit
-npm run build
-cd ../..
-git diff --check
+提交：
+
+```text
+aef153e feat: enforce persisted permission rules
 ```
 
-结果：
+主要内容：
 
-- Go 测试通过。
-- TypeScript 类型检查通过。
-- Vite 生产构建通过。
-- `git diff --check` 通过。
-- `npm run build` 仍有既有 warning：bundle chunk 大于 500 kB、Node ESM warning；这些不是失败项。
+- 将已持久化的 permission rules 接入工具权限判断。
+- 覆盖 read/write/edit/bash 等权限路径。
+- 合并后本地只剩 `master` 分支。
 
-当前本轮只刷新交接文档，若要继续改代码，建议重新跑相关验证。
+### 3.2 左侧对话列表 UI 优化
+
+主要文件：
+
+- `desktop/frontend/src/components/layout/LeftSidebar.tsx`
+- `desktop/frontend/src/components/layout/AppLayout.tsx`
+- `desktop/frontend/src/styles/globals.css`
+
+主要内容：
+
+- 左侧栏宽度调整为 `284px`。
+- 顶部改为轻量标题、icon-only 新建按钮、管理按钮。
+- 新增搜索输入框和搜索无结果空态。
+- 对话行改为更现代的紧凑单行样式。
+- 空态改为更轻的居中样式。
+- 底部用户区视觉统一为侧栏账号行。
+- 新增侧栏专用主题变量，适配深色/浅色切换。
+
+### 3.3 新建对话与工作区展开修复
+
+主要文件：
+
+- `desktop/frontend/src/App.tsx`
+- `desktop/frontend/src/components/layout/LeftSidebar.tsx`
+- `desktop/frontend/src/stores/sessionStore.ts`
+
+主要内容：
+
+- 新建空对话后立即加入前端 session 列表。
+- 左侧栏会根据 `selectedWorkspace` 和 `currentSessionId` 自动展开对应工作区分组。
+- 选择文件夹后，如果当前是空对话，会同步更新本地 session 的 `workspaceId`。
+- 发送首条消息前移动 session 时也同步本地工作区，避免 UI 等后端刷新。
 
 ---
 
-## 6. 下个 session 建议接手步骤
+## 4. 已验证
 
-1. 先确认状态：
+本轮按用户要求未跑测试。
 
-```powershell
-git status --short --branch --untracked-files=all
-git log --oneline -5
-git diff --stat
-```
+已做的轻量检查：
 
-2. 若只想保存本交接刷新，可以提交：
-
-```powershell
-git add HANDOFF_CURRENT.md
-git commit -m "docs: refresh current handoff state"
-```
-
-3. 若要继续功能开发，建议先选一个明确目标，再按范围补测试并实现。
+- 使用本地页面截图查看深色侧栏效果。
+- 使用本地 Chrome CDP 临时切到浅色类名查看浅色侧栏效果。
+- 未执行 `go test`、`npm run build`、`npx tsc --noEmit`。
 
 ---
 
-## 7. 推荐下一步功能
+## 5. 当前潜在问题
+
+1. Wails 自动生成文件仍有改动：`desktop/frontend/src/wails/wailsjs/go/desktop/App.d.ts`、`App.js`、`models.ts`。
+2. 本轮没有按测试流程验证类型检查或构建，因为用户明确要求不需要测试。
+3. `npm run build` 既有大 chunk warning 和 Node ESM warning 仍未处理。
+
+---
+
+## 6. 建议下一步
 
 建议优先级：
 
-1. 配置持久化：补齐 `MemoryConfig`、`CheckpointConfig`、`PermissionConfig`，并让高级设置面板调用后端保存。
-2. 文件树真实数据：把前端文件树从 mock root 改为后端目录树接口。
-3. 子智能体真实执行：把 `internal/actor` 的模拟执行替换为真实 LLM 子 Agent 生命周期。
-4. 任务 ID 语义：改成 `T1`、`T1.1` 这种树状编号，并补齐任务 rename/archive/progress 能力。
-5. Dream & Distill：把关键词/placeholder 流程升级为真实候选解析和确认安装流程。
+1. 文件树真实数据：把前端 `FileTree` 从 mock root 改为后端目录树接口。
+2. 子智能体真实执行：把 `internal/actor` 的模拟执行替换为真实 LLM 子 Agent 生命周期。
+3. Memory 配置生效：让 `ccIndex` 和 `searchScoreFloor` 真正影响 memory reconcile/search 行为。
+4. 任务 ID 语义：改成 `T1`、`T1.1` 这种树状编号，并补齐 task rename/archive/progress。
+
+---
+
+## 7. 下个 session 建议接手步骤
+
+先确认状态：
+
+```powershell
+git status --short --branch --untracked-files=all
+git log --oneline -6
+git branch -r --format='%(refname:short)'
+```
+
+如果继续前端体验优化，建议先看：
+
+- `desktop/frontend/src/components/layout/LeftSidebar.tsx`
+- `desktop/frontend/src/App.tsx`
+- `desktop/frontend/src/stores/sessionStore.ts`
+- `desktop/frontend/src/styles/globals.css`
+
+如果继续后端功能开发，建议先看：
+
+- `internal/session/store.go`
+- `desktop/app_session.go`
+- `internal/tools/*`
+- `internal/agent/agent.go`
 
 ---
 
@@ -170,22 +160,26 @@ git commit -m "docs: refresh current handoff state"
 
 后端：
 
-- `desktop/app_checkpoint.go`
 - `desktop/app_session.go`
-- `desktop/app_multi_agent.go`
-- `desktop/app_chat.go`
-- `internal/agent/agent.go`
 - `internal/session/store.go`
-- `internal/actor/actor.go`
+- `internal/permission/ruleset.go`
+- `internal/safety/guardrail.go`
+- `internal/agent/agent.go`
+- `internal/tools/*`
 
 前端：
 
 - `desktop/frontend/src/App.tsx`
-- `desktop/frontend/src/components/checkpoint/CheckpointPanel.tsx`
-- `desktop/frontend/src/components/task/TaskPanel.tsx`
-- `desktop/frontend/src/components/actor/ActorPanel.tsx`
 - `desktop/frontend/src/components/layout/LeftSidebar.tsx`
+- `desktop/frontend/src/components/layout/AppLayout.tsx`
+- `desktop/frontend/src/stores/sessionStore.ts`
+- `desktop/frontend/src/styles/globals.css`
+- `desktop/frontend/src/wails/wailsjs/go/desktop/App.d.ts`
+- `desktop/frontend/src/wails/wailsjs/go/desktop/App.js`
+- `desktop/frontend/src/wails/wailsjs/go/models.ts`
 
 规划文档：
 
 - `docs/MiMo-Code-Integration-Plan.md`
+- `docs/superpowers/specs/2026-06-12-advanced-settings-persistence-design.md`
+- `docs/superpowers/plans/2026-06-12-advanced-settings-persistence.md`
