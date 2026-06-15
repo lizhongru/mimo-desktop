@@ -1,4 +1,4 @@
-# MiMo Desktop - HANDOFF (2026-06-15)
+﻿# MiMo Desktop - HANDOFF (2026-06-15)
 
 > 工作区：`D:\works\study\mimo cli`
 > 分支：`master` | 远端：`origin/master`
@@ -15,118 +15,101 @@
 
 ---
 
-## 2. Git 提交历史
+## 2. Git 提交历史（最近 10 条）
 
 ```text
+156a930 feat: actor streaming output
+3c4eefc feat: task panel event timeline on expand
+cf713b8 perf: code splitting — main bundle 1.2MB → 460KB
+3277501 feat: file preview modal, JSON tree, code block modernization
+86f2302 docs: update HANDOFF for new session
 aebc0c5 chore: regenerate wails bindings for task methods
 98de7ae feat: tree-style task IDs, rename/archive/progress
 76e0720 feat: memory config now affects runtime behavior
 e5ad79a feat: real LLM execution for sub-agents (actors)
 5c7dda8 feat: workspace file tree, welcome-first new chat, sidebar styling
-0d072fc feat: refine sidebar conversations
-aef153e feat: enforce persisted permission rules
-7b75b2f feat: persist advanced settings
-0e55a2e docs: define advanced settings persistence
-0bdaebc feat: auto checkpoint saved chat sessions
 ```
 
 ---
 
-## 3. 本轮完成的功能
+## 3. 本轮完成的功能（4 个提交）
 
-### 3.1 任务面板 rename/archive/progress（本轮新增）
-- `TaskPanel.tsx` 新增 4 个 state（renamingTaskId/renameValue/progressTaskId/progressValue）。
-- 新增 3 个 handler：`handleRenameTask`、`handleArchiveTask`、`handleProgressTask`。
-- 新增 3 个操作按钮：重命名（紫色）、进度（青色）、归档（灰色）。
-- 新增 2 个 inline 编辑器：重命名输入框、进度说明输入框，支持 Enter 提交和取消。
-- `STATUS_COLORS` 新增 `archived: "text-gray-500"`，`STATUS_ICONS` 新增 `archived: Archive`。
-- `i18n.ts` 新增 6 个翻译键：`task_rename/task_archive/task_progress/task_progress_placeholder/task_rename_placeholder/task_unblock`。
+### 3.1 文件预览弹窗 + JSON 树 + 代码块现代化（3277501）
+- **FilePreviewModal.tsx**（新建）：独立全屏弹窗预览，不挤压聊天区域。
+  - 暗色半透明遮罩 + backdrop-blur，适配亮/暗主题。
+  - 支持最大化/还原、Esc 关闭、换行切换、在资源管理器中打开。
+  - 图片查看器带缩放控制。
+  - 文字可选中（`select-text` + CSS 规则覆盖外层 `select-none`）。
+- **JsonTree.tsx**（新建/重写）：
+  - 左侧固定 `w-5` gutter 专门放折叠箭头，右侧 JSON 内容不受干扰。
+  - 配色：字符串绿色、数字橙色、布尔紫色、键名蓝色。
+  - 无复制按钮，纯选中模式。
+- **CodeBlock.tsx**（新建）：移除复制按钮，现代化字体和间距。
+- **MarkdownPreview.tsx**（新建）：暗色主题 Markdown 渲染。
+- **RightSidebar.tsx**（重写）：
+  - 文件树始终显示，不再被预览替换。
+  - 预览加载/错误改为底部浮动 toast，不遮挡文件树。
+  - 文件夹展开状态在预览操作中保持不变。
 
-### 3.2 文件预览增强 — 图片支持（本轮新增）
-- `app_files.go`：`FilePreview` 结构体新增 `IsImage`/`Mime` 字段。
-- 新增 `isImageExtension` 和 `mimeByExtension` 辅助函数，支持 png/jpg/gif/webp/bmp/ico/svg。
-- `ReadFilePreview` 对图片文件返回 base64 编码内容 + MIME 类型。
-- `RightSidebar.tsx` 新增图片预览区域，使用 `data:` URL 渲染 base64 图片。
+### 3.2 Code splitting（cf713b8）
+- `vite.config.ts`：`manualChunks` 拆分 syntax-highlighter、vendor-react、vendor-state、vendor-icons。
+- `AppLayout.tsx`：6 个面板组件改为 `React.lazy`（SettingsPage、ToolsViewer、MemoryPanelModal、CheckpointPanelModal、TaskPanelModal、ActorPanelModal）。
+- **效果**：主包 1,212KB → 460KB（-62%），gzip 392KB → 137KB。
 
-### 3.3 文件预览增强 — Markdown 渲染（本轮新增）
-- 新建 `components/file/MarkdownPreview.tsx`，基于 `react-markdown`。
-- 使用 Tailwind prose 类 + 自定义 `[&_xxx]` 选择器实现深色主题适配。
-- 支持 h1-h3、段落、代码块、行内代码、列表、链接、引用、表格、图片、分隔线。
-- `RightSidebar.tsx` 中 `language === "markdown"` 时自动使用 MarkdownPreview。
+### 3.3 任务面板事件历史（3c4eefc）
+- `TaskPanel.tsx`：展开任务时懒加载事件（`TaskGetEvents` API），首次展开才请求。
+- 左侧垂直时间线 + 彩色圆点标记事件类型（created/started/completed/blocked/progress/renamed 等）。
+- 显示时间戳和事件摘要。
 
-### 3.4 文件预览增强 — JSON 折叠树（本轮新增）
-- 新建 `components/file/JsonTree.tsx`，支持对象/数组递归渲染。
-- 默认展开前 2 层，深层可点击折叠/展开。
-- 字符串绿色、数字琥珀色、布尔紫色、null 灰色，key 蓝色。
-- `RightSidebar.tsx` 中 `language === "json"` 时尝试 JSON.parse，成功用 JsonTree，失败回退 CodeBlock。
-
-### 3.5 文件预览能力（上轮完成）
-- `desktop/app_files.go` 新增 `ReadFilePreview`，支持目录、文本文件、二进制文件识别。
-- `RightSidebar.tsx` 新增 `PreviewView`，支持返回文件树、行号展示、Reveal in explorer。
-
-### 3.6 文件树真实数据（5c7dda8）
-- `desktop/app_files.go`：`ListWorkspaceFiles` 和 `ListDirChildren`，尊重 `.mimoignore`。
-- `FileTree.tsx` 从 mock 改为懒加载真实目录数据。
-- `RightSidebar.tsx` 新增 Activity / Files 双 Tab。
-
-### 3.7 新建对话跳欢迎页（5c7dda8）
-- `handleNewChat` 不再创建后端 session，只清空状态回欢迎页。
-- 实际 session 在 `handleSend` 发第一条消息时懒创建。
-
-### 3.8 子智能体真实 LLM 执行（e5ad79a）
-- `internal/actor/actor.go` 新增 `Executor` 接口 + `NewRegistryWithExecutor`。
-- `desktop/app_actor_executor.go` 实现完整 tool-use 循环（最多 10 轮）。
-- `app.go` 启动时注入真实 executor，无 LLM 时回退 mock。
-
-### 3.9 Memory 配置生效（76e0720）
-- `Config{CCIndex, SearchScoreFloor}` 传入 `NewServiceWithConfig`。
-- `Reconcile` 检查 `CCIndex=false` 时只做 prune。
-- `ftsSearch` 用 `SearchScoreFloor` 替代硬编码 0.15。
-
-### 3.10 任务 ID 语义化（98de7ae）
-- ID 从 `T{ns}` 改为 `T1/T1.1` 树状编号。
-- 新增 Rename/Archive/Progress + `TaskArchived` 状态。
-- Desktop 层暴露 `TaskRename/TaskArchive/TaskProgress`。
+### 3.4 Actor 流式输出（156a930）
+- `internal/actor/actor.go`：`Executor` 接口新增 `SetStreamCallback`，`Registry` 透传回调。
+- `desktop/app_actor_executor.go`：`llmExecutor` 改用 `ChatStream` 替代 `Chat`，流式推送文本 delta 和工具调用通知。
+- `desktop/app_actor.go`：`initActorRegistry` 注册流式回调，通过 `runtime.EventsEmit` 推送 `actor:delta` 事件。
+- `desktop/events.go` + `lib/events.ts`：新增 `EventActorDelta` / `ACTOR_DELTA` 事件。
+- `ActorPanel.tsx`：监听流式事件，running 状态下实时显示输出 + 闪烁光标。
 
 ---
 
 ## 4. 验证状态
 
-本轮完成后，已通过以下校验：
-
-- `cd desktop/frontend; npm run build` — 2948 modules, build success
+- `cd desktop/frontend; vite build` — ✓ built in ~5-10s，主包 460KB
 - `go build ./desktop/... ./internal/...` — success
 - `go vet ./desktop/... ./internal/...` — success
-- `go test ./desktop/... ./internal/...` — all pass (desktop 2.4s)
-
-注意：`npx tsc --noEmit` 仍存在历史窗口类型噪声，不阻塞功能交付。
+- `go test ./desktop/... ./internal/...` — all pass
 
 ---
 
 ## 5. 已知潜在问题
 
-1. **Vite 大 chunk warning**：`index.js` 超 500KB，需 code-split。Node ESM warning 仍在。不影响功能。
-2. **Wails 自动生成文件**：每次 `wails generate module` 会改 `App.d.ts/App.js/models.ts`，需手动提交。
-3. **actor 测试覆盖不足**：现有测试只覆盖 mock registry，未覆盖 `llmExecutor`。建议补 mock gateway 集成测试。
-4. **任务树 ID 与旧数据混合**：旧 `T{ns}` 格式仍存在 DB，新任务从 `T1` 开始。同 session 新旧混合，前端显示可能不一致。非阻塞。
-5. **Memory CCIndex=false UX**：关闭后 Search 仍工作（搜已有索引），但 Reconcile 不再索引新文件。用户可能误解。需 UI 说明。
-6. **前端 `tsc --noEmit` 噪声仍在**：建议后续统一收敛全局 Window 类型定义。
-7. **react-markdown 新增依赖**：`package-lock.json` 和 `node_modules` 会更新，需提交。
+1. **Vite 大 chunk warning**：syntax-highlighter chunk 660KB，可进一步按语言拆分。不阻塞。
+2. **react-markdown + react-syntax-highlighter 重复导入**：MarkdownPreview 和 CodeBlock 都导入了 syntax-highlighter，可能造成重复 chunk。考虑统一。
+3. **actor 流式输出缓冲**：`streamRef` 在组件卸载后可能仍更新 state（内存泄漏风险）。建议加 unmount 清理。
+4. **TaskGetEvents 无缓存**：每次展开都请求后端，可加 localStorage 或 SWR 缓存。
+5. **FilePreviewModal 动画**：退出动画用 setTimeout 200ms，如果 onClose 回调中有状态更新可能闪烁。
+6. **JsonTree 深层性能**：level < 3 默认展开，超大 JSON（1000+ keys）可能卡顿。考虑虚拟化或限制展开数量。
+7. **Wails 自动生成文件**：每次 `wails generate module` 会改 `App.d.ts/App.js/models.ts`，需手动提交。
+8. **前端 `tsc --noEmit` 噪声**：历史窗口类型定义不完整，不阻塞功能。
+9. **Node.js 版本**：当前 22.3.0，Vite 7 要求 22.12+，有 warning 但不影响构建。
 
 ---
 
-## 6. 建议下一步
+## 6. 建议下一步（按优先级）
 
-### 前端体验
-1. **文件预览进一步增强**：PDF 预览、视频缩略图、代码折叠。
-2. **Code splitting**：处理 Vite 大 chunk warning。
-3. **任务面板事件历史**：点击任务展开时加载 `TaskGetEvents` 显示事件时间线。
+### 高优先级
+1. **Skill 系统对接**：Dream/Distill 产出应落盘为 `.mimo/skills/` 下的 skill 文件。
+2. **MCP 工具在 actor 可用**：确认 `llmExecutor` 是否包含 MCP 工具定义，当前 `e.tools.Definitions()` 应已包含，需实际测试验证。
+3. **会话导出增强**：支持 Markdown 格式导出（当前只有纯文本）。
 
-### 后端功能
-4. **Actor 流式输出**：`llmExecutor` 用非流式 Chat，改 `ChatStream` + 事件推送。
-5. **Skill 系统对接**：Dream/Distill 产出应落盘为 skill 文件。
-6. **MCP 工具在 actor 可用**：确认 `llmExecutor` 是否包含 MCP 工具。
-7. **会话导出增强**：支持 Markdown 格式导出。
+### 中优先级
+4. **输入历史记录**：上下箭头翻阅历史消息。
+5. **消息右键菜单**：复制/重新生成/删除。
+6. **Token 预算警告**：状态栏变色提示上下文接近上限。
+
+### 低优先级
+7. **PDF 预览**：FilePreviewModal 支持 PDF 渲染。
+8. **文件变更 diff 预览**：在预览弹窗里做 diff 视图。
+9. **系统托盘支持**。
+10. **多窗口/多标签**。
 
 ---
 
@@ -134,30 +117,27 @@ aef153e feat: enforce persisted permission rules
 
 ### 后端
 - `desktop/app.go` — 主 Wails 绑定对象
-- `desktop/app_files.go` — 文件树接口 + 文件预览接口（含图片 base64）
-- `desktop/app_actor.go` — Actor Wails 绑定
-- `desktop/app_actor_executor.go` — LLM 执行器
-- `desktop/app_memory.go` — Memory Wails 绑定
-- `desktop/app_task.go` — Task Wails 绑定（含 Rename/Archive/Progress）
-- `internal/actor/actor.go` — Actor 生命周期 + Executor 接口
+- `desktop/app_files.go` — 文件树 + 文件预览
+- `desktop/app_actor.go` — Actor Wails 绑定 + 流式回调注册
+- `desktop/app_actor_executor.go` — LLM 执行器（流式 ChatStream）
+- `desktop/app_task.go` — Task Wails 绑定（含 GetEvents）
+- `desktop/events.go` — 事件名常量（含 EventActorDelta）
+- `internal/actor/actor.go` — Actor 生命周期 + Executor 接口（含 StreamCallback）
 - `internal/agent/agent.go` — 核心 Agent
-- `internal/memory/service.go` — Memory 检索 + 索引
-- `internal/task/registry.go` — 任务持久化 + 树状 ID
-- `internal/tools/registry.go` — 工具注册中心
 - `internal/llm/gateway.go` — LLM 网关
 
 ### 前端
 - `App.tsx` — 全局入口 + 事件绑定
-- `components/layout/AppLayout.tsx` — 主布局
-- `components/layout/LeftSidebar.tsx` — 左侧栏
-- `components/layout/RightSidebar.tsx` — 右侧栏（Activity + Files + File Preview）
-- `components/file/FileTree.tsx` — 文件树
-- `components/file/MarkdownPreview.tsx` — Markdown 渲染组件（新增）
-- `components/file/JsonTree.tsx` — JSON 折叠树组件（新增）
-- `components/task/TaskPanel.tsx` — 任务面板（含 rename/archive/progress）
-- `stores/sessionStore.ts` — Session 状态
-- `stores/chatStore.ts` — Chat 状态
-- `lib/i18n.ts` — 国际化（含新增任务操作翻译键）
+- `components/layout/AppLayout.tsx` — 主布局 + 6 个 lazy 面板
+- `components/layout/RightSidebar.tsx` — 文件树 + toast 提示
+- `components/file/FilePreviewModal.tsx` — 文件预览弹窗
+- `components/file/JsonTree.tsx` — JSON 折叠树（左侧 gutter）
+- `components/file/CodeBlock.tsx` — 代码块
+- `components/file/MarkdownPreview.tsx` — Markdown 渲染
+- `components/task/TaskPanel.tsx` — 任务面板（含事件时间线）
+- `components/actor/ActorPanel.tsx` — 子智能体面板（含流式输出）
+- `lib/events.ts` — 事件常量（含 ACTOR_DELTA）
+- `vite.config.ts` — Code splitting 配置
 
 ---
 
@@ -165,10 +145,15 @@ aef153e feat: enforce persisted permission rules
 
 ```powershell
 cd desktop/frontend; npm install
-cd desktop/frontend; npm run build
-wails generate module
+cd desktop/frontend; npx vite.cmd build
 go build ./desktop/... ./internal/...
 go test ./desktop/... ./internal/...
 go vet ./desktop/... ./internal/...
-git -c http.sslBackend=schannel -c http.version=HTTP/1.1 push origin master
 ```
+
+---
+
+## 9. AGENTS.md 规则
+
+- 所有回答必须用中文。
+- 每次回复开头称呼用户为"哥哥"。
