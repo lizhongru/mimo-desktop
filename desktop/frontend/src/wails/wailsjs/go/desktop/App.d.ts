@@ -125,6 +125,8 @@ export function SetSafetyLevel(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function TaskArchive(arg1:string):Promise<desktop.TaskResult>;
+
 export function TaskBlock(arg1:string,arg2:string):Promise<desktop.TaskResult>;
 
 export function TaskCreate(arg1:string,arg2:string):Promise<desktop.TaskResult>;
@@ -136,6 +138,10 @@ export function TaskDone(arg1:string,arg2:string):Promise<desktop.TaskResult>;
 export function TaskGetEvents(arg1:string):Promise<Array<desktop.TaskEventInfo>>;
 
 export function TaskList(arg1:string,arg2:boolean):Promise<Array<desktop.TaskInfo>>;
+
+export function TaskProgress(arg1:string,arg2:string):Promise<desktop.TaskResult>;
+
+export function TaskRename(arg1:string,arg2:string):Promise<desktop.TaskResult>;
 
 export function TaskStart(arg1:string,arg2:string,arg3:string):Promise<desktop.TaskResult>;
 

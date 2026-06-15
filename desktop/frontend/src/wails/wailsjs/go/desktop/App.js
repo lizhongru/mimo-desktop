@@ -246,6 +246,10 @@ export function SetTheme(arg1) {
   return window['go']['desktop']['App']['SetTheme'](arg1);
 }
 
+export function TaskArchive(arg1) {
+  return window['go']['desktop']['App']['TaskArchive'](arg1);
+}
+
 export function TaskBlock(arg1, arg2) {
   return window['go']['desktop']['App']['TaskBlock'](arg1, arg2);
 }
@@ -268,6 +272,14 @@ export function TaskGetEvents(arg1) {
 
 export function TaskList(arg1, arg2) {
   return window['go']['desktop']['App']['TaskList'](arg1, arg2);
+}
+
+export function TaskProgress(arg1, arg2) {
+  return window['go']['desktop']['App']['TaskProgress'](arg1, arg2);
+}
+
+export function TaskRename(arg1, arg2) {
+  return window['go']['desktop']['App']['TaskRename'](arg1, arg2);
 }
 
 export function TaskStart(arg1, arg2, arg3) {
