@@ -65,6 +65,8 @@ export function IsBusy():Promise<boolean>;
 
 export function ListCheckpoints():Promise<Array<desktop.CheckpointInfo>>;
 
+export function ListDirChildren(arg1:string):Promise<Array<desktop.FileNode>>;
+
 export function ListMemoryFiles():Promise<Array<desktop.MemoryFileInfo>>;
 
 export function ListRemoteModels(arg1:string):Promise<Array<llm.ModelInfo>>;
@@ -72,6 +74,8 @@ export function ListRemoteModels(arg1:string):Promise<Array<llm.ModelInfo>>;
 export function ListRemoteModelsWithConfig(arg1:string,arg2:string):Promise<Array<llm.ModelInfo>>;
 
 export function ListSessions(arg1:number):Promise<Array<desktop.SessionDTO>>;
+
+export function ListWorkspaceFiles(arg1:string,arg2:number):Promise<Array<desktop.FileNode>>;
 
 export function ListWorkspaces():Promise<Array<desktop.WorkspaceDTO>>;
 

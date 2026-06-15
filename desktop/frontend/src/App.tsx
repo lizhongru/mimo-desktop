@@ -74,6 +74,9 @@ declare global {
           WindowIsMaximised: () => Promise<boolean>;
           OpenInExplorer: (path: string) => Promise<void>;
           SelectDirectory: () => Promise<string>;
+          // File tree methods
+          ListWorkspaceFiles: (path: string, maxDepth: number) => Promise<Array<{ name: string; path: string; isDir: boolean; children?: Array<{ name: string; path: string; isDir: boolean }> }>>;
+          ListDirChildren: (dirPath: string) => Promise<Array<{ name: string; path: string; isDir: boolean }>>;
           ListRemoteModels: (modelName: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
           ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
           // Checkpoint methods
@@ -191,28 +194,17 @@ export default function App() {
     window.go?.desktop?.App?.CancelOperation?.().catch(console.error);
   }, []);
 
-  // New chat — create session bound to current workspace
+  // New chat - just reset to welcome view; actual session created on first send
   const handleNewChat = useCallback(() => {
-    const ws = useSessionStore.getState().selectedWorkspace || DEFAULT_WS;
-    window.go?.desktop?.App?.CreateNewSession?.(ws).then((id) => {
-      const sessStore = useSessionStore.getState();
-      const now = new Date().toISOString();
-      sessStore.setCurrentSessionId(id);
-      if (!sessStore.sessions.some((session) => session.id === id)) {
-        sessStore.addSession({
-          id,
-          workspaceId: ws,
-          modelName: currentModel,
-          userName: "",
-          lastMessage: "",
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-      useChatStore.getState().clearMessages();
-      useActivityStore.getState().clear();
-    }).catch(console.error);
-  }, [currentModel]);
+    const sessStore = useSessionStore.getState();
+    const msgs = useChatStore.getState().messages;
+    if (msgs.length === 0 && !sessStore.currentSessionId) {
+      return;
+    }
+    sessStore.setCurrentSessionId(null as unknown as string);
+    useChatStore.getState().clearMessages();
+    useActivityStore.getState().clear();
+  }, []);
 
   // Load existing session — restore workspace from backend
   const handleLoadSession = useCallback((id: string) => {

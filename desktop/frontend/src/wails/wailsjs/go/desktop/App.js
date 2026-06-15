@@ -126,6 +126,10 @@ export function ListCheckpoints() {
   return window['go']['desktop']['App']['ListCheckpoints']();
 }
 
+export function ListDirChildren(arg1) {
+  return window['go']['desktop']['App']['ListDirChildren'](arg1);
+}
+
 export function ListMemoryFiles() {
   return window['go']['desktop']['App']['ListMemoryFiles']();
 }
@@ -140,6 +144,10 @@ export function ListRemoteModelsWithConfig(arg1, arg2) {
 
 export function ListSessions(arg1) {
   return window['go']['desktop']['App']['ListSessions'](arg1);
+}
+
+export function ListWorkspaceFiles(arg1, arg2) {
+  return window['go']['desktop']['App']['ListWorkspaceFiles'](arg1, arg2);
 }
 
 export function ListWorkspaces() {

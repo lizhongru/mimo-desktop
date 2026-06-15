@@ -445,7 +445,7 @@ export function LeftSidebar({
         <button
           onClick={onToggle}
           onContextMenu={(e) => handleWorkspaceContextMenu(e, wsId)}
-          className={`flex min-h-[28px] w-full items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer ${isPinned ? "text-accent" : "text-txt-m hover:bg-[var(--sidebar-item-hover)] hover:text-txt-2"
+          className={`flex min-h-[28px] w-full items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium tracking-normal transition-colors cursor-pointer ${isPinned ? "text-accent" : "text-txt-m hover:bg-[var(--sidebar-item-hover)] hover:text-txt-2"
             }`}
         >
           <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} />
@@ -476,7 +476,7 @@ export function LeftSidebar({
             </button>
           )}
           {!manageMode && (
-            <span className="ml-auto text-[10px] font-medium text-txt-g">{dirSessions.length}</span>
+            <span className="ml-auto text-[10px] text-txt-m">{dirSessions.length}</span>
           )}
         </button>
         {expanded && <div className="mt-px space-y-px">{dirSessions.map(renderSessionRow)}</div>}
@@ -492,7 +492,7 @@ export function LeftSidebar({
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold leading-tight text-txt">{t("conversations")}</div>
             <div className="mt-0.5 text-[10px] leading-tight text-txt-g">
-              {sessions.length === 0 ? "暂无会话" : `${sessions.length} 个会话`}
+              {sessions.length === 0 ? "暂无会话" : `${sessions.length}`}
             </div>
           </div>
           <button
@@ -584,7 +584,10 @@ export function LeftSidebar({
           renderWorkspaceGroup(wsId, dirSessions, expandedWorkspaceIds.has(wsId), () => toggleWorkspaceExpanded(wsId))
         )}
 
-        {defaultSessions.length > 0 &&
+        {defaultSessions.length > 0 && otherEntries.length === 0 && (
+          <div className="space-y-px">{defaultSessions.map(renderSessionRow)}</div>
+        )}
+        {defaultSessions.length > 0 && otherEntries.length > 0 &&
           renderWorkspaceGroup("default", defaultSessions, defaultExpanded, () => setDefaultExpanded(!defaultExpanded))}
       </div>
 

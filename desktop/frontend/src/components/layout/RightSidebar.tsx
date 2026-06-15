@@ -8,9 +8,12 @@ import {
   ChevronRight,
   ListChecks,
   X,
+  FolderTree,
+  Activity,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useActivityStore, type ActivityEntry } from "../../stores/activityStore";
+import { FileTree, FileTreeRefreshButton } from "../file/FileTree";
 import { t } from "../../lib/i18n";
 
 function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
@@ -57,33 +60,81 @@ function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
   );
 }
 
+type RightTab = "activity" | "files";
+
 export function RightSidebar() {
   const entries = useActivityStore((s) => s.entries);
   const plan = useActivityStore((s) => s.plan);
   const fileDiffs = useActivityStore((s) => s.fileDiffs);
   const setRightSidebarOpen = useActivityStore((s) => s.setRightSidebarOpen);
 
+  const [tab, setTab] = useState<RightTab>("activity");
+  const [treeKey, setTreeKey] = useState(0);
+
+  const handleRefreshTree = useCallback(() => {
+    setTreeKey((k) => k + 1);
+  }, []);
+
+  const handleFileClick = useCallback((path: string) => {
+    // Future: open file preview
+    console.log("File clicked:", path);
+  }, []);
+
   return (
     <div className="flex flex-col h-full w-[320px]">
-      {/* Header with close button */}
-      <div className="px-3 py-2.5 border-b border-bdr-sub flex items-center gap-2">
-        <Wrench className="w-4 h-4 text-txt-g" />
-        <span className="text-sm font-medium text-txt">{t("activity")}</span>
-        <span className="text-[10px] text-txt-m ml-auto mr-2">
-          {entries.length}
-        </span>
+      {/* Header: tabs + close */}
+      <div className="px-2 py-1.5 border-b border-bdr-sub flex items-center gap-0.5">
         <button
-          onClick={() => setRightSidebarOpen(false)}
-          className="p-1 rounded hover:bg-elevated text-txt-g hover:text-txt transition-colors cursor-pointer"
-          title={`${t("close")} (Ctrl+I)`}
+          onClick={() => setTab("activity")}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+            tab === "activity"
+              ? "bg-elevated text-txt font-medium"
+              : "text-txt-g hover:text-txt hover:bg-elevated/50"
+          }`}
         >
-          <X className="w-3.5 h-3.5" />
+          <Activity className="w-3.5 h-3.5" />
+          <span>{t("activity")}</span>
+          {entries.length > 0 && (
+            <span className="text-[10px] text-txt-m ml-0.5">
+              {entries.length}
+            </span>
+          )}
         </button>
+        <button
+          onClick={() => setTab("files")}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+            tab === "files"
+              ? "bg-elevated text-txt font-medium"
+              : "text-txt-g hover:text-txt hover:bg-elevated/50"
+          }`}
+        >
+          <FolderTree className="w-3.5 h-3.5" />
+          <span>Files</span>
+        </button>
+
+        <div className="ml-auto flex items-center gap-1">
+          {tab === "files" && (
+            <FileTreeRefreshButton onClick={handleRefreshTree} />
+          )}
+          <button
+            onClick={() => setRightSidebarOpen(false)}
+            className="p-1 rounded hover:bg-elevated text-txt-g hover:text-txt transition-colors cursor-pointer"
+            title={`${t("close")} (Ctrl+I)`}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Plan Panel */}
-        {plan && (
+      {/* Tab content */}
+      {tab === "files" ? (
+        <div className="flex-1 overflow-y-auto">
+          <FileTree key={treeKey} onFileClick={handleFileClick} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {/* Plan Panel */}
+          {plan && (
           <div className="border-b border-bdr-sub p-3">
             <div className="flex items-center gap-2 mb-2">
               <ListChecks className="w-3.5 h-3.5 text-accent" />
@@ -168,18 +219,19 @@ export function RightSidebar() {
           </div>
         )}
 
-        {/* Activity Log */}
-        <div>
-          {entries.length === 0 && (
-            <div className="px-4 py-8 text-center text-txt-m text-xs">
-              {t("no_activity")}
-            </div>
-          )}
-          {entries.map((entry) => (
-            <ActivityEntryItem key={entry.id} entry={entry} />
-          ))}
+          {/* Activity Log */}
+          <div>
+            {entries.length === 0 && (
+              <div className="px-4 py-8 text-center text-txt-m text-xs">
+                {t("no_activity")}
+              </div>
+            )}
+            {entries.map((entry) => (
+              <ActivityEntryItem key={entry.id} entry={entry} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
