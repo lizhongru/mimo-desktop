@@ -22,7 +22,7 @@ export function MessageList() {
     const el = containerRef.current;
     if (!el) return;
     // Use instant for session load (large batch), smooth for streaming
-    const behavior = currentDelta || currentThinking ? "smooth" : "instant";
+    const behavior = "smooth";
     // Double-rAF to ensure DOM is painted
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
