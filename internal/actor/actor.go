@@ -1,4 +1,4 @@
-package actor
+﻿package actor
 
 import (
 	"context"
@@ -61,10 +61,14 @@ type Message struct {
 	Content string
 }
 
+// StreamCallback receives real-time updates from an actor execution.
+type StreamCallback func(actorID string, delta string, isTool bool)
+
 // Executor runs the actual task for an actor.
 // Implementations can use LLM, mock logic, or any other backend.
 type Executor interface {
 	ExecuteActor(ctx context.Context, actor *Actor) (string, error)
+	SetStreamCallback(cb StreamCallback)
 }
 
 // Registry manages actor lifecycle
@@ -73,6 +77,7 @@ type Registry struct {
 	actors   map[string]*Actor
 	nextID   int
 	executor Executor // nil = use mock fallback
+	streamCB StreamCallback
 }
 
 // NewRegistry creates a new actor registry with mock execution
@@ -215,6 +220,14 @@ func (r *Registry) Send(actorID string, content string) error {
 	return nil
 }
 
+// SetStreamCallback sets the callback for real-time actor stream updates.
+func (r *Registry) SetStreamCallback(cb StreamCallback) {
+	r.streamCB = cb
+	if r.executor != nil {
+		r.executor.SetStreamCallback(cb)
+	}
+}
+
 // Cancel cancels an actor
 func (r *Registry) Cancel(actorID string) error {
 	r.mu.Lock()
@@ -256,3 +269,5 @@ func (r *Registry) Cleanup(olderThan time.Duration) int {
 	}
 	return removed
 }
+
+

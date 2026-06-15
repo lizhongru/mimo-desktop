@@ -1,4 +1,4 @@
-package desktop
+﻿package desktop
 
 // Wails event name constants — agent callbacks and chat lifecycle
 const (
@@ -26,4 +26,8 @@ const (
 
 	// Safety confirmation event
 	EventSafetyConfirm = "safety:confirm"
+
+	// Actor streaming events
+	EventActorDelta = "actor:delta"
 )
+

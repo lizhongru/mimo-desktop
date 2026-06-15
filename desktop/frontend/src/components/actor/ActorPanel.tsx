@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+﻿import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Bot,
   Play,
@@ -8,6 +8,7 @@ import {
   Trash2,
   RefreshCw,
 } from "lucide-react";
+import { EventsOn, EVENTS } from "../../lib/events";
 
 interface ActorInfo {
   id: string;
@@ -58,6 +59,8 @@ export function ActorPanel() {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastResult, setLastResult] = useState<ActorResult | null>(null);
+  const [streamOutput, setStreamOutput] = useState<Record<string, string>>({});
+  const streamRef = useRef<Record<string, string>>({});
 
   const loadActors = useCallback(async () => {
     try {
@@ -72,7 +75,23 @@ export function ActorPanel() {
     loadActors();
     // Auto-refresh every 2 seconds
     const interval = setInterval(loadActors, 2000);
-    return () => clearInterval(interval);
+
+    // Listen for actor stream deltas
+    const unsub = EventsOn(EVENTS.ACTOR_DELTA, (...args: unknown[]) => {
+      const data = args[0] as { actorId: string; delta: string; isTool: boolean };
+      if (data?.actorId && data?.delta) {
+        streamRef.current = {
+          ...streamRef.current,
+          [data.actorId]: (streamRef.current[data.actorId] || "") + data.delta,
+        };
+        setStreamOutput({ ...streamRef.current });
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsub();
+    };
   }, [loadActors]);
 
   const handleSpawn = useCallback(async () => {
@@ -233,6 +252,14 @@ export function ActorPanel() {
                   </div>
                 </div>
 
+                {/* Live stream output */}
+                {actor.status === "running" && streamOutput[actor.id] && (
+                  <div className="ml-6 p-2 bg-blue-500/5 border border-blue-500/20 rounded text-xs text-txt-2 font-mono whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
+                    {streamOutput[actor.id]}
+                    <span className="inline-block w-1.5 h-3 bg-blue-400 animate-pulse ml-0.5 align-middle" />
+                  </div>
+                )}
+
                 {/* Result or Error */}
                 {actor.result && (
                   <div className="ml-6 p-2 bg-green-500/5 border border-green-500/20 rounded text-xs text-green-400">
@@ -273,3 +300,5 @@ export function ActorPanel() {
     </div>
   );
 }
+
+

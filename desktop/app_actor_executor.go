@@ -1,9 +1,10 @@
-package desktop
+﻿package desktop
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/mimo-cli/mimo-cli/internal/actor"
 	"github.com/mimo-cli/mimo-cli/internal/llm"
@@ -14,12 +15,17 @@ const maxActorIterations = 10
 
 // llmExecutor implements actor.Executor using a real LLM with tool-use loop.
 type llmExecutor struct {
-	gateway *llm.Gateway
-	tools   *tools.Registry
+	gateway  *llm.Gateway
+	tools    *tools.Registry
+	streamCB actor.StreamCallback
 }
 
 func newLLMExecutor(gw *llm.Gateway, tr *tools.Registry) *llmExecutor {
 	return &llmExecutor{gateway: gw, tools: tr}
+}
+
+func (e *llmExecutor) SetStreamCallback(cb actor.StreamCallback) {
+	e.streamCB = cb
 }
 
 func (e *llmExecutor) ExecuteActor(ctx context.Context, act *actor.Actor) (string, error) {
@@ -56,25 +62,65 @@ func (e *llmExecutor) ExecuteActor(ctx context.Context, act *actor.Actor) (strin
 		req := llm.ChatRequest{
 			Messages: messages,
 			Tools:    toolDefs,
-			Stream:   false,
+			Stream:   true,
 		}
 
-		resp, err := e.gateway.Chat(ctx, req)
+		ch, err := e.gateway.ChatStream(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("LLM call failed: %w", err)
 		}
 
-		if len(resp.ToolCalls) == 0 {
-			return resp.Content, nil
+		var fullContent strings.Builder
+		var toolCalls []llm.ToolCall
+		toolCallIndexMap := make(map[int]int)
+
+		for chunk := range ch {
+			if chunk.Error != nil {
+				return "", chunk.Error
+			}
+
+			if chunk.Delta != "" {
+				fullContent.WriteString(chunk.Delta)
+				if e.streamCB != nil {
+					e.streamCB(act.ID, chunk.Delta, false)
+				}
+			}
+
+			if len(chunk.ToolCalls) > 0 {
+				for _, tc := range chunk.ToolCalls {
+					if tc.ID != "" {
+						idx := len(toolCalls)
+						toolCalls = append(toolCalls, tc)
+						toolCallIndexMap[chunk.ToolCallIndex] = idx
+						// Notify frontend about tool call
+						if e.streamCB != nil {
+							e.streamCB(act.ID, fmt.Sprintf("\n🔧 %s", tc.Function.Name), true)
+						}
+					} else if tc.Function.Arguments != "" {
+						if pos, ok := toolCallIndexMap[chunk.ToolCallIndex]; ok {
+							toolCalls[pos].Function.Arguments += tc.Function.Arguments
+						}
+					}
+				}
+			}
 		}
 
+		content := fullContent.String()
+
+		// No tool calls → final response
+		if len(toolCalls) == 0 {
+			return content, nil
+		}
+
+		// Add assistant message
 		messages = append(messages, llm.Message{
 			Role:      llm.RoleAssistant,
-			Content:   resp.Content,
-			ToolCalls: resp.ToolCalls,
+			Content:   content,
+			ToolCalls: toolCalls,
 		})
 
-		for _, tc := range resp.ToolCalls {
+		// Execute tool calls
+		for _, tc := range toolCalls {
 			var params map[string]interface{}
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &params); err != nil {
 				params = map[string]interface{}{}
@@ -93,6 +139,15 @@ func (e *llmExecutor) ExecuteActor(ctx context.Context, act *actor.Actor) (strin
 				}
 			} else {
 				toolResult = fmt.Sprintf("Tool %s not available", tc.Function.Name)
+			}
+
+			// Notify tool result
+			if e.streamCB != nil {
+				preview := toolResult
+				if len(preview) > 100 {
+					preview = preview[:100] + "..."
+				}
+				e.streamCB(act.ID, fmt.Sprintf("  └─ %s", preview), true)
 			}
 
 			messages = append(messages, llm.Message{
@@ -116,9 +171,9 @@ func buildActorSystemPrompt(t actor.ActorType) string {
 	case actor.ActorTitle:
 		return "You are a title generation agent. Given content, produce a concise descriptive title. Return ONLY the title, under 60 characters."
 	case actor.ActorSummary:
-		return "You are a summarization agent. Condense the given content into a clear summary preserving key information, decisions, and action items."
+		return "You are a summarization agent. Condense the given content into a clear summary preserving essential context."
 	case actor.ActorCompaction:
-		return "You are a context compaction agent. Compress the given conversation into a brief summary preserving essential context."
+		return "You are a context compaction agent. Compress the current conversation into a brief summary preserving essential context."
 	case actor.ActorDream:
 		return "You are a reflection agent. Analyze the session and extract reusable patterns, insights, or skills."
 	case actor.ActorDistill:

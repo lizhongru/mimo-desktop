@@ -1,4 +1,4 @@
-package desktop
+﻿package desktop
 
 import (
 	"context"
@@ -145,3 +145,4 @@ func actorInfoFromActor(act *actor.Actor) *ActorInfo {
 		CompletedAt: act.CompletedAt,
 	}
 }
+
