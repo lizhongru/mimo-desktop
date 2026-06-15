@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef } from "react";
 import { useChatStore } from "../../stores/chatStore";
 import { MessageBubble } from "./MessageBubble";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -20,7 +20,7 @@ export function MessageList() {
   // Auto-scroll to bottom on new content
   useEffect(() => {
     if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current.scrollIntoView({ behavior: messages.length > 1 ? "smooth" : "instant" });
     }
   }, [messages.length, currentDelta, currentThinking, currentToolCalls.length]);
 
