@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAgent } from "./hooks/useAgent";
 import { useChatStore } from "./stores/chatStore";
@@ -41,6 +41,7 @@ export default function App() {
   const sessStore = useSessionStore();
   const { currentSessionId } = sessStore;
 
+  const doneGuard = useRef(false);
   // Load session list on mount
   useEffect(() => {
     window.go?.desktop?.App?.ListSessions?.(100)
@@ -68,6 +69,8 @@ export default function App() {
       setStreaming(false);
     };
     const handleDone = (_: unknown, payload?: { response?: string; duration?: number }) => {
+      if (doneGuard.current) return; // prevent duplicate finalize
+      doneGuard.current = true;
       const state = useChatStore.getState();
       finalizeResponse(state.currentDelta, payload?.duration || 0);
       // Save session to backend, then update sidebar item in-place
@@ -79,7 +82,6 @@ export default function App() {
           tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0,
         }));
         window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).then(() => {
-          // Find last user message for sidebar display
           const lastUser = [...useChatStore.getState().messages].reverse().find((m) => m.role === "user");
           useSessionStore.getState().updateSession(sid, lastUser?.content || "");
         }).catch(console.error);
@@ -172,6 +174,7 @@ export default function App() {
   const handleSend = useCallback(
     async (message: string, attachments?: string) => {
       if (!message.trim() && !attachments) return;
+      doneGuard.current = false;
 
       // If no session exists yet, create one lazily
       let sessionId = useSessionStore.getState().currentSessionId;
