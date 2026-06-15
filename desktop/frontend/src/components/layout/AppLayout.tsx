@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+﻿import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useActivityStore } from "../../stores/activityStore";
@@ -9,12 +9,12 @@ import { MessageList } from "../chat/MessageList";
 import { ChatInput } from "../chat/ChatInput";
 import { StatusBar } from "../chat/StatusBar";
 import { ConfirmDialog } from "../confirm/ConfirmDialog";
-import { ToolsViewer } from "../common/ToolsViewer";
-import { SettingsPage } from "../settings/SettingsPage";
-import { MemoryPanelModal } from "../common/MemoryPanelModal";
-import { CheckpointPanelModal } from "../common/CheckpointPanelModal";
-import { TaskPanelModal } from "../common/TaskPanelModal";
-import { ActorPanelModal } from "../common/ActorPanelModal";
+const ToolsViewer = lazy(() => import("../common/ToolsViewer").then(m => ({ default: m.ToolsViewer })));
+const SettingsPage = lazy(() => import("../settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const MemoryPanelModal = lazy(() => import("../common/MemoryPanelModal").then(m => ({ default: m.MemoryPanelModal })));
+const CheckpointPanelModal = lazy(() => import("../common/CheckpointPanelModal").then(m => ({ default: m.CheckpointPanelModal })));
+const TaskPanelModal = lazy(() => import("../common/TaskPanelModal").then(m => ({ default: m.TaskPanelModal })));
+const ActorPanelModal = lazy(() => import("../common/ActorPanelModal").then(m => ({ default: m.ActorPanelModal })));
 import { WelcomeView } from "../welcome/WelcomeView";
 import { useChatStore } from "../../stores/chatStore";
 import {
@@ -245,3 +245,4 @@ export function AppLayout({
     </div>
   );
 }
+
