@@ -19,14 +19,18 @@ type MemorySearchResult struct {
 	Type    string  `json:"type"`
 }
 
-// MemoryService returns the memory service (lazy init)
+// MemoryService returns the memory service (lazy init with config)
 func (a *App) memoryService() *memory.Service {
 	if a.sessionStore == nil {
 		return nil
 	}
 	if a.memorySvc == nil {
 		wd, _ := os.Getwd()
-		a.memorySvc = memory.NewService(a.sessionStore.DB(), wd, a.currentSessionID)
+		cfg := memory.Config{
+			CCIndex:          a.cfg.Memory.CCIndex,
+			SearchScoreFloor: a.cfg.Memory.SearchScoreFloor,
+		}
+		a.memorySvc = memory.NewServiceWithConfig(a.sessionStore.DB(), wd, a.currentSessionID, cfg)
 		a.memorySvc.Init()
 	}
 	return a.memorySvc

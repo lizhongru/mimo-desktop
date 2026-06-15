@@ -27,18 +27,44 @@ type SearchOpts struct {
 	Limit   int    `json:"limit"`
 }
 
-// Service manages the memory system
-type Service struct {
-	db    *sql.DB
-	paths *Paths
+// Config holds memory-system configuration that affects runtime behavior.
+type Config struct {
+	CCIndex          bool    // Whether to enable automatic indexing on Reconcile
+	SearchScoreFloor float64 // Minimum score ratio to keep in search results (0-1, default 0.15)
 }
 
-// NewService creates a new memory service
+// DefaultConfig returns the default memory config.
+func DefaultConfig() Config {
+	return Config{
+		CCIndex:          true,
+		SearchScoreFloor: 0.15,
+	}
+}
+
+// Service manages the memory system
+type Service struct {
+	db     *sql.DB
+	paths  *Paths
+	config Config
+}
+
+// NewService creates a new memory service with default config
 func NewService(db *sql.DB, projectDir, sessionID string) *Service {
 	paths := NewPaths(projectDir, sessionID)
 	return &Service{
-		db:    db,
-		paths: paths,
+		db:     db,
+		paths:  paths,
+		config: DefaultConfig(),
+	}
+}
+
+// NewServiceWithConfig creates a new memory service with explicit config
+func NewServiceWithConfig(db *sql.DB, projectDir, sessionID string, cfg Config) *Service {
+	paths := NewPaths(projectDir, sessionID)
+	return &Service{
+		db:     db,
+		paths:  paths,
+		config: cfg,
 	}
 }
 
@@ -165,10 +191,14 @@ func (s *Service) ftsSearch(ftsQuery, whereClause string, params []interface{}, 
 		results = append(results, r)
 	}
 
-	// Apply score floor (keep top result and those within 15% of top score)
+	// Apply score floor from config
+	floor := s.config.SearchScoreFloor
+	if floor <= 0 {
+		floor = 0.15
+	}
 	if len(results) > 1 {
 		topScore := results[0].Score
-		cutoff := topScore * 0.15
+		cutoff := topScore * floor
 		var filtered []SearchResult
 		for i, r := range results {
 			if i == 0 || r.Score >= cutoff {
@@ -294,11 +324,23 @@ func (s *Service) RemoveFile(path, scope string) error {
 	return nil
 }
 
-// Reconcile scans memory directories and updates the index
+// Reconcile scans memory directories and updates the index.
+// If CCIndex is disabled, only prunes deleted entries.
 func (s *Service) Reconcile() (indexed int, pruned int, err error) {
 	// Ensure directories exist
 	if err := s.paths.EnsureDirectories(); err != nil {
 		return 0, 0, err
+	}
+
+	// Prune deleted files regardless of CCIndex setting
+	pruned, err = s.pruneDeleted()
+	if err != nil {
+		return 0, pruned, err
+	}
+
+	// Skip indexing if CCIndex is disabled
+	if !s.config.CCIndex {
+		return 0, pruned, nil
 	}
 
 	// Index global memory
@@ -318,8 +360,6 @@ func (s *Service) Reconcile() (indexed int, pruned int, err error) {
 		}
 	}
 
-	// Prune deleted files
-	pruned, err = s.pruneDeleted()
 
 	return
 }
