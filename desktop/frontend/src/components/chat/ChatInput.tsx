@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+﻿import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import {
   ChevronDown,
   FileText,
@@ -102,10 +102,20 @@ export function ChatInput({ onSend, onCancel }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const inputHistory = useRef<string[]>([]);
+  const historyIndex = useRef(-1);
+  const savedInput = useRef("");
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
+    // Push to input history (deduplicate consecutive)
+    const hist = inputHistory.current;
+    if (hist.length === 0 || hist[hist.length - 1] !== trimmed) {
+      hist.push(trimmed);
+    }
+    historyIndex.current = -1;
+    savedInput.current = "";
     onSend(trimmed, attachments.length > 0 ? attachments : undefined);
     setText("");
     setAttachments([]);
@@ -126,6 +136,39 @@ export function ChatInput({ onSend, onCancel }: Props) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
+    }
+    const hist = inputHistory.current;
+    if (hist.length === 0) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    // Only navigate history when cursor is on first line (Up) or last line (Down)
+    // and the selection is collapsed
+    if (e.key === "ArrowUp" && !e.shiftKey) {
+      const cursorPos = ta.selectionStart;
+      const beforeCursor = text.slice(0, cursorPos);
+      if (beforeCursor.includes("\n")) return; // not on first line
+      e.preventDefault();
+      if (historyIndex.current === -1) {
+        savedInput.current = text;
+        historyIndex.current = hist.length - 1;
+      } else if (historyIndex.current > 0) {
+        historyIndex.current -= 1;
+      }
+      setText(hist[historyIndex.current]);
+    } else if (e.key === "ArrowDown" && !e.shiftKey) {
+      const cursorPos = ta.selectionStart;
+      const afterCursor = text.slice(cursorPos);
+      if (afterCursor.includes("\n")) return; // not on last line
+      e.preventDefault();
+      if (historyIndex.current === -1) return;
+      if (historyIndex.current < hist.length - 1) {
+        historyIndex.current += 1;
+        setText(hist[historyIndex.current]);
+      } else {
+        historyIndex.current = -1;
+        setText(savedInput.current);
+      }
     }
   };
 
