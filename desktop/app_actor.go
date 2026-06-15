@@ -40,6 +40,13 @@ func getActorRegistry() *actor.Registry {
 	return actorRegistry
 }
 
+// initActorRegistry initializes the registry with LLM executor if available
+func initActorRegistry(app *App) {
+	if app.gateway != nil && app.registry != nil {
+		actorRegistry = actor.NewRegistryWithExecutor(newLLMExecutor(app.gateway, app.registry))
+	}
+}
+
 // ActorSpawn creates and starts a new actor
 func (a *App) ActorSpawn(actorType string, prompt string, taskID string) ActorResult {
 	a.mu.Lock()

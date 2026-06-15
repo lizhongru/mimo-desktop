@@ -61,18 +61,34 @@ type Message struct {
 	Content string
 }
 
-// Registry manages actor lifecycle
-type Registry struct {
-	mu     sync.RWMutex
-	actors map[string]*Actor
-	nextID int
+// Executor runs the actual task for an actor.
+// Implementations can use LLM, mock logic, or any other backend.
+type Executor interface {
+	ExecuteActor(ctx context.Context, actor *Actor) (string, error)
 }
 
-// NewRegistry creates a new actor registry
+// Registry manages actor lifecycle
+type Registry struct {
+	mu       sync.RWMutex
+	actors   map[string]*Actor
+	nextID   int
+	executor Executor // nil = use mock fallback
+}
+
+// NewRegistry creates a new actor registry with mock execution
 func NewRegistry() *Registry {
 	return &Registry{
-		actors: make(map[string]*Actor),
+		actors:  make(map[string]*Actor),
 		nextID: 1,
+	}
+}
+
+// NewRegistryWithExecutor creates a new actor registry with a real executor
+func NewRegistryWithExecutor(exec Executor) *Registry {
+	return &Registry{
+		actors:  make(map[string]*Actor),
+		nextID: 1,
+		executor: exec,
 	}
 }
 
@@ -104,93 +120,44 @@ func (r *Registry) Spawn(ctx context.Context, opts SpawnOpts) (*Actor, error) {
 }
 
 // runActor executes the actor's task
-func (r *Registry) runActor(ctx context.Context, actor *Actor) {
+func (r *Registry) runActor(ctx context.Context, act *Actor) {
 	r.mu.Lock()
-	actor.Status = ActorRunning
+	act.Status = ActorRunning
 	now := time.Now().Unix()
-	actor.StartedAt = &now
+	act.StartedAt = &now
 	r.mu.Unlock()
 
-	// Simulate actor execution based on type
 	var result string
 	var err error
 
-	switch actor.Type {
-	case ActorExplore:
-		result, err = r.runExplore(ctx, actor)
-	case ActorGeneral:
-		result, err = r.runGeneral(ctx, actor)
-	case ActorTitle:
-		result, err = r.runTitle(ctx, actor)
-	case ActorSummary:
-		result, err = r.runSummary(ctx, actor)
-	default:
-		result, err = r.runDefault(ctx, actor)
+	if r.executor != nil {
+		result, err = r.executor.ExecuteActor(ctx, act)
+	} else {
+		result, err = r.runMock(ctx, act)
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	completedAt := time.Now().Unix()
-	actor.CompletedAt = &completedAt
+	act.CompletedAt = &completedAt
 
 	if err != nil {
-		actor.Status = ActorFailed
-		actor.Error = err.Error()
+		act.Status = ActorFailed
+		act.Error = err.Error()
 	} else {
-		actor.Status = ActorCompleted
-		actor.Result = result
+		act.Status = ActorCompleted
+		act.Result = result
 	}
 }
 
-// runExplore handles explore actor type
-func (r *Registry) runExplore(ctx context.Context, actor *Actor) (string, error) {
-	// Placeholder for explore logic
+// runMock is the fallback when no executor is configured
+func (r *Registry) runMock(ctx context.Context, act *Actor) (string, error) {
 	select {
 	case <-ctx.Done():
 		return "", ctx.Err()
 	case <-time.After(100 * time.Millisecond):
-		return fmt.Sprintf("Explored: %s", actor.Prompt), nil
-	}
-}
-
-// runGeneral handles general actor type
-func (r *Registry) runGeneral(ctx context.Context, actor *Actor) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		return fmt.Sprintf("Processed: %s", actor.Prompt), nil
-	}
-}
-
-// runTitle handles title actor type
-func (r *Registry) runTitle(ctx context.Context, actor *Actor) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	case <-time.After(50 * time.Millisecond):
-		return "Generated Title", nil
-	}
-}
-
-// runSummary handles summary actor type
-func (r *Registry) runSummary(ctx context.Context, actor *Actor) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		return fmt.Sprintf("Summary of: %s", actor.Prompt), nil
-	}
-}
-
-// runDefault handles default actor type
-func (r *Registry) runDefault(ctx context.Context, actor *Actor) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		return fmt.Sprintf("Completed: %s", actor.Prompt), nil
+		return fmt.Sprintf("[%s] Processed: %s", act.Type, act.Prompt), nil
 	}
 }
 

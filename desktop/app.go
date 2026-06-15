@@ -176,6 +176,9 @@ func NewApp() (*App, error) {
 		},
 	)
 
+	// Initialize actor registry with real LLM executor
+	initActorRegistry(a)
+
 	return a, nil
 }
 
