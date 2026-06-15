@@ -19,9 +19,16 @@ export function MessageList() {
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: messages.length > 1 ? "smooth" : "instant" });
-    }
+    const el = containerRef.current;
+    if (!el) return;
+    // Use instant for session load (large batch), smooth for streaming
+    const behavior = currentDelta || currentThinking ? "smooth" : "instant";
+    // Double-rAF to ensure DOM is painted
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior });
+      });
+    });
   }, [messages.length, currentDelta, currentThinking, currentToolCalls.length]);
 
   return (

@@ -252,11 +252,6 @@ export default function App() {
             durationMs: m.durationMs,
           });
         }
-        // Scroll to bottom after messages are rendered
-        requestAnimationFrame(() => {
-          const el = document.querySelector(".flex-1.overflow-y-auto");
-          if (el) el.scrollTop = el.scrollHeight;
-        });
       } catch (e) {
         console.error("Failed to load session:", e);
       }
