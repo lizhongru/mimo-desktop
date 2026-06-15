@@ -28,11 +28,6 @@ import {
 } from "lucide-react";
 import { t } from "../../lib/i18n";
 
-function formatTokens(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
-}
-
 interface Props {
   modelName: string;
   onSend: (message: string, attachments?: { name: string; type: string; dataUrl: string }[]) => void;
@@ -65,13 +60,14 @@ export function AppLayout({
   const leftOpen = useSessionStore((s) => s.leftSidebarOpen);
   const rightOpen = useActivityStore((s) => s.rightSidebarOpen);
   const confirmAction = useChatStore((s) => s.confirmAction);
-  const usage = useChatStore((s) => s.usage);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [checkpointOpen, setCheckpointOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [actorOpen, setActorOpen] = useState(false);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [isMaximised, setIsMaximised] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -105,7 +101,6 @@ export function AppLayout({
       className={`h-screen flex flex-col bg-root text-txt select-none relative ${dragActive ? "drag-active" : ""}`} onDragEnter={(e) => { e.preventDefault(); dragCounter.current += 1; if (dragCounter.current === 1) setDragActive(true); }} onDragLeave={(e) => { e.preventDefault(); dragCounter.current -= 1; if (dragCounter.current <= 0) { dragCounter.current = 0; setDragActive(false); } }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); dragCounter.current = 0; setDragActive(false); }}>
       {/* Modern Title Bar */}
       <div className="relative h-10 flex items-center border-b border-bdr-div bg-root flex-shrink-0 drag-region">
-        {/* Left: sidebar toggle */}
         <div className="flex items-center gap-1 pl-3 no-drag z-10">
           <button
             onClick={() => useSessionStore.getState().toggleLeftSidebar()}
@@ -118,15 +113,13 @@ export function AppLayout({
           </button>
         </div>
 
-        {/* Center: App title — absolute centered */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none drag-region">
-          <span className="text-[13px] font-semibold tracking-wide text-txt">
+          <span className="text-xs font-medium text-txt-g tracking-wide">
             {t("app_name")}
           </span>
         </div>
 
-        {/* Right: sidebar toggle + window controls */}
-        <div className="flex items-center no-drag z-10 ml-auto">
+        <div className="ml-auto flex items-center gap-0.5 pr-1 no-drag z-10">
           <button
             onClick={() => setToolsOpen(true)}
             className={`p-1.5 rounded-md hover:bg-elevated/80 transition-colors cursor-pointer text-txt-g hover:text-txt`}
@@ -145,10 +138,8 @@ export function AppLayout({
             <PanelRight className="w-[15px] h-[15px]" />
           </button>
 
-          {/* Divider */}
           <div className="w-px h-4 bg-bdr-div mx-1" />
 
-          {/* Window controls */}
           <button
             onClick={handleMinimise}
             className="w-[46px] h-10 flex items-center justify-center hover:bg-elevated/80 transition-colors cursor-pointer text-txt-g hover:text-txt"
@@ -218,47 +209,38 @@ export function AppLayout({
           )}
         </div>
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar — dynamic width */}
         <div
-          className={`border-l border-bdr bg-surface transition-all duration-200 flex-shrink-0 overflow-hidden ${
-            rightOpen ? "w-[320px]" : "w-0"
-          }`}
+          className="border-l border-bdr bg-surface flex-shrink-0 overflow-hidden"
+          style={{
+            width: rightOpen ? rightWidth : 0,
+            transition: isDragging ? "none" : "width 200ms ease",
+          }}
         >
-          {rightOpen && <RightSidebar />}
+          {rightOpen && (
+            <RightSidebar
+              width={rightWidth}
+              onWidthChange={setRightWidth}
+              onDragStart={() => setIsDragging(true)}
+              onDragEnd={() => setIsDragging(false)}
+            />
+          )}
         </div>
       </div>
 
-      {/* Settings Page Modal */}
-      <SettingsPage
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        defaultModel={modelName}
-      />
-
-      {/* Tools Viewer Modal */}
+      {/* Modals */}
+      <SettingsPage open={settingsOpen} onClose={() => setSettingsOpen(false)} defaultModel={modelName} />
       <ToolsViewer open={toolsOpen} onClose={() => setToolsOpen(false)} />
-
-      {/* Memory / Checkpoint / Task / Actor Modals — rendered outside sidebar to avoid overflow-hidden clipping */}
       <MemoryPanelModal open={memoryOpen} onClose={() => setMemoryOpen(false)} />
       <CheckpointPanelModal open={checkpointOpen} onClose={() => setCheckpointOpen(false)} />
       <TaskPanelModal open={taskOpen} onClose={() => setTaskOpen(false)} />
       <ActorPanelModal open={actorOpen} onClose={() => setActorOpen(false)} />
 
-      {/* Confirm Dialog (global overlay) */}
       <ConfirmDialog
         action={confirmAction}
-        onApprove={() => {
-          onConfirmApprove();
-          useChatStore.getState().setConfirmAction(null);
-        }}
-        onDeny={() => {
-          onConfirmDeny();
-          useChatStore.getState().setConfirmAction(null);
-        }}
-        onApproveAll={() => {
-          onConfirmApproveAll();
-          useChatStore.getState().setConfirmAction(null);
-        }}
+        onApprove={() => { onConfirmApprove(); useChatStore.getState().setConfirmAction(null); }}
+        onDeny={() => { onConfirmDeny(); useChatStore.getState().setConfirmAction(null); }}
+        onApproveAll={() => { onConfirmApproveAll(); useChatStore.getState().setConfirmAction(null); }}
       />
     </div>
   );

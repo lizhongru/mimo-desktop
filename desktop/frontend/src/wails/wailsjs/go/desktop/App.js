@@ -182,6 +182,10 @@ export function OpenInExplorer(arg1) {
   return window['go']['desktop']['App']['OpenInExplorer'](arg1);
 }
 
+export function ReadFilePreview(arg1) {
+  return window['go']['desktop']['App']['ReadFilePreview'](arg1);
+}
+
 export function ReadMemory(arg1) {
   return window['go']['desktop']['App']['ReadMemory'](arg1);
 }

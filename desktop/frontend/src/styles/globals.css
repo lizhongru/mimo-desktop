@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -174,4 +174,19 @@ html {
 
 .drag-drop-zone {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='6' y='4' width='14' height='18' rx='2' fill='%23383838' stroke='%23c48870' stroke-width='1.5'/%3E%3Crect x='10' y='8' width='14' height='18' rx='2' fill='%23555' stroke='%23c48870' stroke-width='1.5'/%3E%3Cpath d='M17 18v4m0 0l-2-2m2 2l2-2' stroke='%23c48870' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 16 16, copy;
+}
+
+/* File preview modal — allow text selection inside modal content */
+.file-preview-modal .select-text,
+.file-preview-modal pre,
+.file-preview-modal code,
+.file-preview-modal p,
+.file-preview-modal span,
+.file-preview-modal div {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.file-preview-modal button {
+  user-select: none;
+  -webkit-user-select: none;
 }

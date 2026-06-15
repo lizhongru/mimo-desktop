@@ -13,234 +13,241 @@ function workspaceIdFromDir(dir: string): string {
   return dir ? `ws:${dir}` : DEFAULT_WS;
 }
 
-type AdvancedSettingsConfig = {
-  memory: { ccIndex: boolean; searchScoreFloor: number };
-  checkpoint: {
-    autoCheckpoint: boolean;
-    tokenThreshold: number;
-    maxCheckpoints: number;
-    reconstructOnResume: boolean;
-    contextBudget: number;
-  };
-  permission: {
-    rules: Array<{ permission: string; action: string; pattern?: string }>;
-  };
-};
-
-declare global {
-  interface Window {
-    go: {
-      desktop: {
-        App: {
-          SendMessage: (message: string, attachmentsJSON?: string) => Promise<void>;
-          CancelOperation: () => Promise<void>;
-          IsBusy: () => Promise<boolean>;
-          RespondToConfirm: (approved: boolean) => Promise<void>;
-          RespondToConfirmAll: (approved: boolean) => Promise<void>;
-          GetModelName: () => Promise<string>;
-          GetVersion: () => Promise<Record<string, string>>;
-          CompressContext: () => Promise<{ before: number; after: number }>;
-          ExportChat: (messages: Array<{ role: string; content: string }>) => Promise<void>;
-          GetWorkingDir: () => Promise<string>;
-          GetTools: () => Promise<Array<{ name: string; description: string; safetyLevel: string; isMcp: boolean; serverName: string }>>;
-          GetMCPServers: () => Promise<Array<{ name: string; connected: boolean; toolCount: number; tools: string[] }>>;
-          // Workspace methods
-          ListWorkspaces: () => Promise<Array<{ id: string; name: string; type: string; path: string }>>;
-          CreateWorkspace: (path: string) => Promise<{ id: string; name: string; type: string; path: string }>;
-          // Session methods
-          ListSessions: (limit: number) => Promise<Array<{ id: string; workspaceId: string; modelName: string; userName: string; lastMessage: string; createdAt: string; updatedAt: string }>>;
-          CreateNewSession: (workspaceId: string) => Promise<string>;
-          LoadSession: (id: string) => Promise<{ id: string; workspaceId: string; modelName: string; messages: Array<{ role: string; content: string; thinking?: string; toolLines?: string[]; tokens: number; toolCalls: number; durationMs: number }> }>;
-          DeleteSession: (id: string) => Promise<void>;
-          RenameSession: (id: string, title: string) => Promise<void>;
-          MoveSession: (sessionId: string, workspaceId: string) => Promise<void>;
-          SaveSessionFromFrontend: (sessionId: string, messages: unknown[]) => Promise<void>;
-          // Config methods
-          GetConfig: () => Promise<{ defaultModel: string; language: string; theme: string; userName: string; models: Record<string, { provider: string; website: string; apiBase: string; apiKey: string; model: string; models: string[]; fallback: string; maxTokens: number; temperature: number; topP: number; streaming: boolean; vision: boolean; tools: boolean }>; safety: { level: string; permission: string }; agent: { maxIterations: number; planningMode: string; permission: string; reasoningLevel: string; showTokenUsage: boolean }; memory: AdvancedSettingsConfig["memory"]; checkpoint: AdvancedSettingsConfig["checkpoint"]; permission: AdvancedSettingsConfig["permission"] }>;
-          SetTheme: (theme: string) => Promise<void>;
-          SetLanguage: (lang: string) => Promise<void>;
-          SetDefaultModel: (name: string) => Promise<void>;
-          UpdateAdvancedSettings: (settings: AdvancedSettingsConfig) => Promise<void>;
-          AddModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
-          UpdateModel: (name: string, provider: string, website: string, apiBase: string, apiKey: string, model: string, models: string[], fallback: string, maxTokens: number, temperature: number, topP: number, streaming: boolean, vision: boolean, tools: boolean) => Promise<void>;
-          RemoveModel: (name: string) => Promise<void>;
-          SetSafetyLevel: (level: string) => Promise<void>;
-          SetPlanningMode: (mode: string) => Promise<void>;
-          SetPermission: (perm: string) => Promise<void>;
-          SetReasoningLevel: (level: string) => Promise<void>;
-          WindowMinimise: () => Promise<void>;
-          WindowMaximise: () => Promise<void>;
-          WindowClose: () => Promise<void>;
-          WindowIsMaximised: () => Promise<boolean>;
-          OpenInExplorer: (path: string) => Promise<void>;
-          SelectDirectory: () => Promise<string>;
-          // File tree methods
-          ListWorkspaceFiles: (path: string, maxDepth: number) => Promise<Array<{ name: string; path: string; isDir: boolean; children?: Array<{ name: string; path: string; isDir: boolean }> }>>;
-          ListDirChildren: (dirPath: string) => Promise<Array<{ name: string; path: string; isDir: boolean }>>;
-          ListRemoteModels: (modelName: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
-          ListRemoteModelsWithConfig: (apiBase: string, apiKey: string) => Promise<Array<{ id: string; owned_by: string; description?: string; context_window?: number; max_output?: number; capabilities?: string[] }>>;
-          // Checkpoint methods
-          CreateCheckpoint: (summary: string) => Promise<{ success: boolean; message: string; id?: string }>;
-          ListCheckpoints: () => Promise<Array<{ id: string; summary: string; token_count: number; message_offset: number; created_at: string }>>;
-          RestoreCheckpoint: (checkpointId: string) => Promise<{ success: boolean; message: string; id?: string }>;
-          DeleteCheckpoint: (checkpointId: string) => Promise<{ success: boolean; message: string }>;
-          ExportCheckpoints: () => Promise<string>;
-          // Memory methods
-          MemorySearch: (query: string, scope: string, limit: number) => Promise<Array<{ path: string; snippet: string; score: number; scope: string; scope_id: string; type: string }>>;
-          MemoryReconcile: () => Promise<[number, number]>;
-          MemoryCount: () => Promise<number>;
-          MemoryIndexFile: (path: string) => Promise<boolean>;
-          WriteMemory: (path: string, content: string) => Promise<boolean>;
-          ReadMemory: (path: string) => Promise<string>;
-          ListMemoryFiles: () => Promise<Array<{ path: string; name: string; size: number; updatedAt: string; scope: string }>>;
-          // Task methods
-          TaskCreate: (summary: string, parentID: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
-          TaskList: (status: string, includeTerminal: boolean) => Promise<Array<{ id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number }>>;
-          TaskStart: (id: string, owner: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
-          TaskDone: (id: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
-          TaskBlock: (id: string, eventSummary: string) => Promise<{ success: boolean; message: string; task?: { id: string; session_id: string; parent_task_id?: string; status: string; summary: string; owner?: string; created_at: number; last_event_at: number; ended_at?: number } }>;
-          TaskDelete: (id: string) => Promise<{ success: boolean; message: string }>;
-          TaskGetEvents: (taskID: string) => Promise<Array<{ id: number; task_id: string; at: number; kind: string; summary?: string }>>;
-          // Actor methods
-          ActorSpawn: (actorType: string, prompt: string, taskID: string) => Promise<{ success: boolean; message: string; actor?: { id: string; type: string; session_id: string; parent_id?: string; status: string; prompt: string; result?: string; error?: string; created_at: number; started_at?: number; completed_at?: number } }>;
-          ActorList: (status: string) => Promise<Array<{ id: string; type: string; session_id: string; status: string; prompt: string; result?: string; error?: string; created_at: number; completed_at?: number }>>;
-          ActorGet: (id: string) => Promise<{ id: string; type: string; session_id: string; parent_id?: string; status: string; prompt: string; result?: string; error?: string; created_at: number; started_at?: number; completed_at?: number } | null>;
-          ActorCancel: (id: string) => Promise<{ success: boolean; message: string }>;
-          ActorCleanup: (maxAge: number) => Promise<number>;
-          // Multi-agent methods
-          AgentListConfigs: () => Promise<Array<{ name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] }>>;
-          AgentGetCurrent: () => Promise<{ name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } | null>;
-          AgentSwitch: (name: string) => Promise<{ success: boolean; message: string; agent?: { name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] } }>;
-          AgentUpdateConfig: (name: string, config: { name: string; mode: string; color: string; description: string; prompt: string; tool_allowlist?: string[] }) => Promise<{ success: boolean; message: string }>;
-          // Dream & Distill methods
-          DreamRun: () => Promise<{ success: boolean; message: string; count: number }>;
-          DistillRun: () => Promise<{ success: boolean; message: string; count: number }>;
-          DistillListCandidates: () => Promise<Array<{ name: string; description: string; confidence: number; pattern?: string; commands?: string[] }>>;
-        };
-      };
-    };
-  }
-}
-
 export default function App() {
   const currentModel = useSettingsStore((s) => s.currentModel);
+  const [toast, setToast] = useState<string | null>(null);
   useAgent();
 
-  // Load sessions, workspaces and config on mount
+  // Chat store state
+  const messages = useChatStore((s) => s.messages);
+  const addUserMessage = useChatStore((s) => s.addUserMessage);
+  const addRestoredMessage = useChatStore((s) => s.addRestoredMessage);
+  const appendDelta = useChatStore((s) => s.appendDelta);
+  const appendThinking = useChatStore((s) => s.appendThinking);
+  const addToolCall = useChatStore((s) => s.addToolCall);
+  const updateToolResult = useChatStore((s) => s.updateToolResult);
+  const finalizeResponse = useChatStore((s) => s.finalizeResponse);
+  const setStreaming = useChatStore((s) => s.setStreaming);
+  const setConfirmAction = useChatStore((s) => s.setConfirmAction);
+  const setCompressing = useChatStore((s) => s.setCompressing);
+  const setUsage = useChatStore((s) => s.setUsage);
+  const clearMessages = useChatStore((s) => s.clearMessages);
+  const resetStreamState = useChatStore((s) => s.resetStreamState);
+
+  // Check if current session has messages (for workspace switching)
+  const hasMessages = messages.length > 0;
+
+  // Session store
+  const sessStore = useSessionStore();
+  const { currentSessionId } = sessStore;
+
+  // Listen for Wails events
   useEffect(() => {
-    Promise.all([
-      window.go?.desktop?.App?.ListSessions?.(30),
-      window.go?.desktop?.App?.ListWorkspaces?.(),
-    ]).then(([sessions, workspaces]) => {
-      useSessionStore.getState().setSessions(sessions || []);
-      useSessionStore.getState().setWorkspaces(workspaces || []);
-    }).catch(console.error);
-
-    window.go?.desktop?.App?.GetConfig?.().then((cfg) => {
-      useSettingsStore.getState().initFromConfig({
-        theme: cfg.theme, language: cfg.language, defaultModel: cfg.defaultModel,
-        models: cfg.models, planningMode: cfg.agent?.planningMode,
-        safetyLevel: cfg.safety?.level, permission: cfg.agent?.permission,
-        reasoningLevel: cfg.agent?.reasoningLevel,
-      });
-    }).catch(console.error);
-  }, []);
-
-  // Send a message — lazy-creates session if needed
-  const handleSend = useCallback(async (message: string, attachments?: { name: string; type: string; dataUrl: string }[]) => {
-    const sessStore = useSessionStore.getState();
-    let sid = sessStore.currentSessionId;
-    const ws = sessStore.selectedWorkspace || DEFAULT_WS;
-
-    if (!sid) {
-      console.log("[handleSend] selectedWorkspace:", sessStore.selectedWorkspace, "=> ws:", ws);
-      try {
-        sid = await window.go?.desktop?.App?.CreateNewSession?.(ws);
-        sessStore.setCurrentSessionId(sid);
-      } catch (e) {
-        console.error("CreateNewSession failed:", e);
-        return;
+    const handleDelta = (_: unknown, text: string) => {
+      appendDelta(text);
+    };
+    const handleThinking = (_: unknown, delta: string) => {
+      appendThinking(delta);
+    };
+    const handleToolCall = (_: unknown, name: string, args: string) => {
+      addToolCall(name, args);
+    };
+    const handleToolResult = (_: unknown, name: string, result: string) => {
+      updateToolResult(name, result);
+    };
+    const handleError = (_: unknown, err: string) => {
+      addRestoredMessage({ role: "assistant", content: `Error: ${err}` });
+      setStreaming(false);
+    };
+    const handleDone = () => {
+      const state = useChatStore.getState();
+      finalizeResponse(state.currentDelta, 0);
+    };
+    const handleUsage = (_: unknown, usage: { promptTokens: number; completionTokens: number; totalTokens: number }) => {
+      setUsage(usage);
+    };
+    const handleCompressing = () => {
+      setCompressing(true);
+    };
+    const handleCompressed = (_: unknown, result: { before: number; after: number }) => {
+      setCompressing(false);
+      if (result) {
+        addRestoredMessage({
+          role: "assistant",
+          content: `Context compressed: ${result.before} → ${result.after} tokens`,
+        });
       }
-    }
-
-    if (sid && useChatStore.getState().messages.length === 0) {
-      await window.go?.desktop?.App?.MoveSession?.(sid, ws);
-      sessStore.updateSessionWorkspace(sid, ws);
-    }
-
-    if (!sessStore.sessions.find((s) => s.id === sid)) {
-      sessStore.addSession({
-        id: sid!,
-        workspaceId: ws,
-        modelName: "",
-        userName: "",
-        lastMessage: message,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    };
+    const handleSafetyConfirm = (_: unknown, action: { level: string; description: string; tool: string; params: Record<string, unknown> }) => {
+      setConfirmAction(action);
+    };
+    const handlePlanning = (_: unknown, message: string) => {
+      useActivityStore.getState().addEntry({
+        type: "plan_step",
+        name: "Planning",
+        status: "running",
+        detail: message,
       });
-    }
+    };
+    const handlePlanGenerated = (_: unknown, plan: { goal: string; steps: Array<{ id: string; description: string; status: string }> }) => {
+      useActivityStore.getState().setPlan({
+        goal: plan.goal,
+        currentStep: 0,
+        totalSteps: plan.steps.length,
+        steps: plan.steps.map((s) => ({
+          id: Number(s.id) || 0,
+          description: s.description,
+          status: (s.status as "pending" | "in_progress" | "completed" | "failed" | "skipped") || "pending",
+        })),
+      });
+    };
+    const handlePlanStepStart = (_: unknown, step: { id: string; description: string; status: string }) => {
+      useActivityStore.getState().updatePlanStep(Number(step.id) || 0, "in_progress");
+    };
+    const handlePlanStepDone = (_: unknown, step: { id: string; description: string; status: string }) => {
+      useActivityStore.getState().updatePlanStep(
+        Number(step.id) || 0,
+        (step.status as "completed" | "failed") || "completed"
+      );
+    };
 
-    sessStore.setStreamingSessionId(sid);
-    useChatStore.getState().addUserMessage(message);
-    const attachmentsJSON = attachments && attachments.length > 0 ? JSON.stringify(attachments) : "";
-    window.go?.desktop?.App?.SendMessage?.(message, attachmentsJSON).catch((err) => {
-      console.error("SendMessage failed:", err);
-      useSessionStore.getState().setStreamingSessionId(null);
-      useChatStore.getState().finalizeResponse(`${t("error_prefix")}: ${err}`, 0);
-    });
-  }, []);
+    // Subscribe to events
+    window.runtime.EventsOn("chat:delta", handleDelta);
+    window.runtime.EventsOn("chat:thinking", handleThinking);
+    window.runtime.EventsOn("chat:tool_call", handleToolCall);
+    window.runtime.EventsOn("chat:tool_result", handleToolResult);
+    window.runtime.EventsOn("chat:error", handleError);
+    window.runtime.EventsOn("chat:done", handleDone);
+    window.runtime.EventsOn("chat:usage", handleUsage);
+    window.runtime.EventsOn("chat:compressing", handleCompressing);
+    window.runtime.EventsOn("chat:compressed", handleCompressed);
+    window.runtime.EventsOn("safety:confirm", handleSafetyConfirm);
+    window.runtime.EventsOn("agent:planning", handlePlanning);
+    window.runtime.EventsOn("agent:plan_generated", handlePlanGenerated);
+    window.runtime.EventsOn("agent:plan_step_start", handlePlanStepStart);
+    window.runtime.EventsOn("agent:plan_step_done", handlePlanStepDone);
+
+    return () => {
+      window.runtime.EventsOff(
+        "chat:delta",
+        "chat:thinking",
+        "chat:tool_call",
+        "chat:tool_result",
+        "chat:error",
+        "chat:done",
+        "chat:usage",
+        "chat:compressing",
+        "chat:compressed",
+        "safety:confirm",
+        "agent:planning",
+        "agent:plan_generated",
+        "agent:plan_step_start",
+        "agent:plan_step_done"
+      );
+    };
+  }, [addRestoredMessage, appendDelta, appendThinking, addToolCall, updateToolResult, setStreaming, setConfirmAction, setCompressing, setUsage, finalizeResponse]);
+
+  const handleSend = useCallback(
+    async (message: string, attachments?: string) => {
+      if (!message.trim() && !attachments) return;
+
+      // If no session exists yet, create one lazily
+      let sessionId = useSessionStore.getState().currentSessionId;
+      if (!sessionId) {
+        try {
+          const activeWs = useSessionStore.getState().selectedWorkspace || DEFAULT_WS;
+          sessionId = await window.go?.desktop?.App?.CreateNewSession?.(activeWs);
+          if (sessionId) {
+            useSessionStore.getState().setCurrentSessionId(sessionId);
+          }
+        } catch (e) {
+          console.error("Failed to create session:", e);
+          return;
+        }
+      }
+
+      // Reset compressing state on new message
+      if (useChatStore.getState().isCompressing) {
+        setCompressing(false);
+      }
+
+      addUserMessage(message);
+      try {
+        await window.go?.desktop?.App?.SendMessage?.(message, attachments || "");
+      } catch (e) {
+        const err = e instanceof Error ? e.message : String(e);
+        if (!err.includes("cancelled")) {
+          addRestoredMessage({ role: "assistant", content: `Error: ${err}` });
+        }
+        setStreaming(false);
+      }
+    },
+    [addUserMessage, addRestoredMessage, setStreaming, setCompressing]
+  );
 
   const handleCancel = useCallback(() => {
     window.go?.desktop?.App?.CancelOperation?.().catch(console.error);
-  }, []);
+    setStreaming(false);
+  }, [setStreaming]);
 
-  // New chat - just reset to welcome view; actual session created on first send
   const handleNewChat = useCallback(() => {
-    const sessStore = useSessionStore.getState();
-    const msgs = useChatStore.getState().messages;
-    if (msgs.length === 0 && !sessStore.currentSessionId) {
-      return;
-    }
-    sessStore.setCurrentSessionId(null as unknown as string);
-    useChatStore.getState().clearMessages();
-    useActivityStore.getState().clear();
-  }, []);
+    // Don't create session yet; just clear UI state and go to welcome view
+    clearMessages();
+    resetStreamState();
+    sessStore.setCurrentSessionId(null);
+  }, [clearMessages, resetStreamState, sessStore]);
 
-  // Load existing session — restore workspace from backend
-  const handleLoadSession = useCallback((id: string) => {
-    window.go?.desktop?.App?.LoadSession?.(id).then((data) => {
-      useSessionStore.getState().setCurrentSessionId(id);
-      useChatStore.getState().clearMessages();
-      useActivityStore.getState().clear();
-      if (data?.messages) {
-        for (const msg of data.messages) {
-          useChatStore.getState().addRestoredMessage(msg as { role: "user" | "assistant"; content: string; thinking?: string; toolLines?: string[]; tokens?: number; toolCalls?: number; durationMs?: number });
+  const handleLoadSession = useCallback(
+    async (id: string) => {
+      try {
+        const data = await window.go?.desktop?.App?.LoadSession?.(id);
+        if (!data) return;
+
+        sessStore.setCurrentSessionId(id);
+
+        // Convert loaded messages to ChatMessage format
+        for (const m of data.messages) {
+          addRestoredMessage({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            thinking: m.thinking,
+            toolLines: m.toolLines,
+            tokens: m.tokens,
+            toolCalls: m.toolCalls,
+            durationMs: m.durationMs,
+          });
         }
+      } catch (e) {
+        console.error("Failed to load session:", e);
       }
-      // Restore workspace selection from backend
-      if (data?.workspaceId) {
-        useSessionStore.getState().setSelectedWorkspace(data.workspaceId);
+    },
+    [addRestoredMessage, sessStore]
+  );
+
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      try {
+        await window.go?.desktop?.App?.DeleteSession?.(id);
+        // If deleted session was current, clear it
+        if (sessStore.currentSessionId === id) {
+          sessStore.setCurrentSessionId(null);
+          clearMessages();
+          resetStreamState();
+        }
+        // Refresh the session list
+        const sessions = await window.go?.desktop?.App?.ListSessions?.(100);
+        sessStore.setSessions(sessions || []);
+      } catch (e) {
+        console.error("Failed to delete session:", e);
       }
-    }).catch(console.error);
-  }, []);
+    },
+    [sessStore, clearMessages, resetStreamState]
+  );
 
-  const handleDeleteSession = useCallback(async (id: string) => {
-    await window.go?.desktop?.App?.DeleteSession?.(id);
-    useSessionStore.getState().removeSession(id);
-    if (useSessionStore.getState().currentSessionId === id) {
-      useChatStore.getState().clearMessages();
-      useSessionStore.getState().setCurrentSessionId(null);
-    }
-  }, []);
-
-  const [toast, setToast] = useState<string | null>(null);
-
-  // Select workspace — update store; session binding happens at creation time
   const handleSelectWorkspace = useCallback(async (dir: string) => {
     const workspaceId = workspaceIdFromDir(dir);
-    const sessStore = useSessionStore.getState();
-    const hasMessages = useChatStore.getState().messages.length > 0;
 
+    // Switch workspace
     sessStore.setSelectedWorkspace(workspaceId);
     if (sessStore.currentSessionId && !hasMessages) {
       await window.go?.desktop?.App?.MoveSession?.(sessStore.currentSessionId, workspaceId);
@@ -265,7 +272,7 @@ export default function App() {
     } else {
       useSessionStore.getState().setSelectedWorkspace(DEFAULT_WS);
     }
-  }, []);
+  }, [hasMessages, sessStore]);
 
   const handleExportSession = useCallback(async (id: string) => {
     useSessionStore.getState().setExportingSessionId(id);

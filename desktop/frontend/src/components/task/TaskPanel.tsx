@@ -10,7 +10,10 @@ import {
   ChevronRight,
   Clock,
   AlertCircle,
+  Archive,
 } from "lucide-react";
+
+import { t } from "../../lib/i18n";
 
 interface TaskInfo {
   id: string;
@@ -44,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "text-yellow-400",
   done: "text-green-400",
   abandoned: "text-red-400",
+  archived: "text-gray-500",
 };
 
 const STATUS_ICONS: Record<string, typeof ListTodo> = {
@@ -52,6 +56,7 @@ const STATUS_ICONS: Record<string, typeof ListTodo> = {
   blocked: AlertCircle,
   done: CheckCircle2,
   abandoned: XCircle,
+  archived: Archive,
 };
 
 export function TaskPanel() {
@@ -63,6 +68,10 @@ export function TaskPanel() {
   const [taskEvents, setTaskEvents] = useState<Record<string, TaskEventInfo[]>>(
     {}
   );
+  const [renamingTaskId, setRenamingTaskId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [progressTaskId, setProgressTaskId] = useState<string | null>(null);
+  const [progressValue, setProgressValue] = useState("");
 
   const loadTasks = useCallback(async () => {
     try {
@@ -160,6 +169,63 @@ export function TaskPanel() {
       }
     },
     [loadTasks]
+  );
+
+  const handleRenameTask = useCallback(
+    async (id: string) => {
+      if (!renameValue.trim()) return;
+      setIsLoading(true);
+      try {
+        const result = await window.go?.desktop?.App?.TaskRename?.(id, renameValue);
+        setLastResult(result);
+        if (result?.success) {
+          setRenamingTaskId(null);
+          setRenameValue("");
+          loadTasks();
+        }
+      } catch (error) {
+        console.error("Failed to rename task:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [renameValue, loadTasks]
+  );
+
+  const handleArchiveTask = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      try {
+        const result = await window.go?.desktop?.App?.TaskArchive?.(id);
+        setLastResult(result);
+        if (result?.success) loadTasks();
+      } catch (error) {
+        console.error("Failed to archive task:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadTasks]
+  );
+
+  const handleProgressTask = useCallback(
+    async (id: string) => {
+      if (!progressValue.trim()) return;
+      setIsLoading(true);
+      try {
+        const result = await window.go?.desktop?.App?.TaskProgress?.(id, progressValue);
+        setLastResult(result);
+        if (result?.success) {
+          setProgressTaskId(null);
+          setProgressValue("");
+        }
+      } catch (error) {
+        console.error("Failed to add progress:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [progressValue]
   );
 
   const toggleExpand = useCallback(async (taskId: string) => {
@@ -303,6 +369,36 @@ export function TaskPanel() {
                         阻塞
                       </button>
                     )}
+                    {/* Rename */}
+                    {task.status !== "done" && task.status !== "abandoned" && task.status !== "archived" && (
+                      <button
+                        onClick={() => { setRenamingTaskId(task.id); setRenameValue(task.summary); setProgressTaskId(null); }}
+                        disabled={isLoading}
+                        className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30"
+                      >
+                        {t("task_rename")}
+                      </button>
+                    )}
+                    {/* Progress */}
+                    {task.status === "in_progress" && (
+                      <button
+                        onClick={() => { setProgressTaskId(task.id); setProgressValue(""); setRenamingTaskId(null); }}
+                        disabled={isLoading}
+                        className="px-2 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30"
+                      >
+                        {t("task_progress")}
+                      </button>
+                    )}
+                    {/* Archive */}
+                    {(task.status === "done" || task.status === "abandoned" || task.status === "blocked") && (
+                      <button
+                        onClick={() => handleArchiveTask(task.id)}
+                        disabled={isLoading}
+                        className="px-2 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded hover:bg-gray-500/30"
+                      >
+                        {t("task_archive")}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDeleteTask(task.id)}
                       disabled={isLoading}
@@ -312,6 +408,60 @@ export function TaskPanel() {
                     </button>
                   </div>
                 </div>
+
+                {/* Inline rename editor */}
+                {renamingTaskId === task.id && (
+                  <div className="flex gap-2 ml-6 mt-2">
+                    <input
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleRenameTask(task.id)}
+                      placeholder={t("task_rename_placeholder")}
+                      className="flex-1 px-2 py-1 text-xs bg-surface border border-bdr rounded text-txt focus:outline-none focus:border-accent"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleRenameTask(task.id)}
+                      disabled={isLoading || !renameValue.trim()}
+                      className="px-2 py-1 text-xs bg-accent/20 text-accent rounded hover:bg-accent/30"
+                    >
+                      {t("save")}
+                    </button>
+                    <button
+                      onClick={() => setRenamingTaskId(null)}
+                      className="px-2 py-1 text-xs text-txt-m hover:text-txt"
+                    >
+                      {t("cancel")}
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline progress editor */}
+                {progressTaskId === task.id && (
+                  <div className="flex gap-2 ml-6 mt-2">
+                    <input
+                      value={progressValue}
+                      onChange={(e) => setProgressValue(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleProgressTask(task.id)}
+                      placeholder={t("task_progress_placeholder")}
+                      className="flex-1 px-2 py-1 text-xs bg-surface border border-bdr rounded text-txt focus:outline-none focus:border-accent"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleProgressTask(task.id)}
+                      disabled={isLoading || !progressValue.trim()}
+                      className="px-2 py-1 text-xs bg-accent/20 text-accent rounded hover:bg-accent/30"
+                    >
+                      {t("save")}
+                    </button>
+                    <button
+                      onClick={() => setProgressTaskId(null)}
+                      className="px-2 py-1 text-xs text-txt-m hover:text-txt"
+                    >
+                      {t("cancel")}
+                    </button>
+                  </div>
+                )}
 
                 {/* Children */}
                 {isExpanded && children.length > 0 && (

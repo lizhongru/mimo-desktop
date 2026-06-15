@@ -226,7 +226,13 @@ type TranslationKey =
   | "about_title"
   | "about_description"
   | "about_github"
-  | "about_version_info";
+  | "about_version_info"
+  | "task_rename"
+  | "task_archive"
+  | "task_progress"
+  | "task_progress_placeholder"
+  | "task_rename_placeholder"
+  | "task_unblock";
 
 const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
   zh: {
@@ -456,6 +462,12 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     about_description: "基于 Wails 的 AI 聊天桌面客户端，由 MiMo 大模型驱动。",
     about_github: "GitHub 仓库",
     about_version_info: "版本信息",
+    task_rename: "重命名",
+    task_archive: "归档",
+    task_progress: "进度",
+    task_progress_placeholder: "输入进度说明...",
+    task_rename_placeholder: "输入新名称...",
+    task_unblock: "解除阻塞",
   },
   en: {
     settings: "Settings",
@@ -684,6 +696,12 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     about_description: "A Wails-based AI chat desktop client powered by MiMo LLM.",
     about_github: "GitHub repository",
     about_version_info: "Version Info",
+    task_rename: "Rename",
+    task_archive: "Archive",
+    task_progress: "Progress",
+    task_progress_placeholder: "Enter progress note...",
+    task_rename_placeholder: "Enter new name...",
+    task_unblock: "Unblock",
   },
 };
 

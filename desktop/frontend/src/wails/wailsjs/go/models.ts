@@ -500,6 +500,36 @@ export namespace desktop {
 		    return a;
 		}
 	}
+	export class FilePreview {
+	    name: string;
+	    path: string;
+	    isDir: boolean;
+	    sizeBytes: number;
+	    isText: boolean;
+	    isImage: boolean;
+	    truncated: boolean;
+	    content: string;
+	    language: string;
+	    mime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FilePreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.isDir = source["isDir"];
+	        this.sizeBytes = source["sizeBytes"];
+	        this.isText = source["isText"];
+	        this.isImage = source["isImage"];
+	        this.truncated = source["truncated"];
+	        this.content = source["content"];
+	        this.language = source["language"];
+	        this.mime = source["mime"];
+	    }
+	}
 	export class MCPServerInfo {
 	    name: string;
 	    connected: boolean;

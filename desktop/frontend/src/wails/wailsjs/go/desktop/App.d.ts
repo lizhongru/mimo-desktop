@@ -93,6 +93,8 @@ export function MoveSession(arg1:string,arg2:string):Promise<void>;
 
 export function OpenInExplorer(arg1:string):Promise<void>;
 
+export function ReadFilePreview(arg1:string):Promise<desktop.FilePreview>;
+
 export function ReadMemory(arg1:string):Promise<string>;
 
 export function RemoveModel(arg1:string):Promise<void>;
