@@ -1,4 +1,4 @@
-package session
+﻿package session
 
 import (
 	"database/sql"
@@ -477,10 +477,9 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT DISTINCT s.id, s.workspace_id, s.model_name, s.user_name, s.last_message, s.created_at, s.updated_at
-		FROM sessions s
-		INNER JOIN messages m ON m.session_id = s.id
-		ORDER BY s.updated_at DESC
+		SELECT id, workspace_id, model_name, user_name, last_message, created_at, updated_at
+		FROM sessions
+		ORDER BY updated_at DESC
 		LIMIT ?
 	`, limit)
 	if err != nil {
@@ -505,11 +504,10 @@ func (s *Store) ListSessionsByWorkspace(workspaceID string, limit int) ([]Sessio
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT DISTINCT s.id, s.workspace_id, s.model_name, s.user_name, s.last_message, s.created_at, s.updated_at
-		FROM sessions s
-		INNER JOIN messages m ON m.session_id = s.id
-		WHERE s.workspace_id = ?
-		ORDER BY s.updated_at DESC
+		SELECT id, workspace_id, model_name, user_name, last_message, created_at, updated_at
+		FROM sessions
+		WHERE workspace_id = ?
+		ORDER BY updated_at DESC
 		LIMIT ?
 	`, workspaceID, limit)
 	if err != nil {

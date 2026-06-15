@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import {
   Plus,
   MessageSquare,
   Trash2,
+  Download,
   FolderOpen,
   Settings,
   ChevronDown,
@@ -87,6 +88,7 @@ function ContextMenu({
   onPin,
   onOpenExplorer,
   onRename,
+  onExport,
   onRemove,
 }: {
   menu: ContextMenuState;
@@ -95,6 +97,7 @@ function ContextMenu({
   onPin: () => void;
   onOpenExplorer: () => void;
   onRename: () => void;
+  onExport: () => void;
   onRemove: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -121,6 +124,9 @@ function ContextMenu({
     { icon: FolderInput, label: t("open_in_explorer"), onClick: onOpenExplorer },
     ...(menu.sessionId
       ? [{ icon: Edit3, label: t("rename"), onClick: onRename }]
+      : []),
+    ...(menu.sessionId
+      ? [{ icon: Download, label: t("export_chat"), onClick: onExport }]
       : []),
     { icon: Trash2, label: t("remove_project"), onClick: onRemove, danger: true },
   ];
@@ -252,6 +258,7 @@ export function LeftSidebar({
   onLoadSession,
   onDeleteSession,
   onOpenSettings,
+  onExportSession,
   onOpenMemory,
   onOpenCheckpoint,
   onOpenTask,
@@ -618,6 +625,11 @@ export function LeftSidebar({
               setRenameTarget(contextMenu.sessionId);
               const s = sessions.find((s) => s.id === contextMenu.sessionId);
               setRenameValue(s?.lastMessage || "");
+            }
+          }}
+          onExport={() => {
+            if (contextMenu.sessionId && onExportSession) {
+              onExportSession(contextMenu.sessionId);
             }
           }}
           onRemove={() => {

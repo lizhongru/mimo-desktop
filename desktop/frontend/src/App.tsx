@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAgent } from "./hooks/useAgent";
 import { useChatStore } from "./stores/chatStore";
@@ -41,7 +41,15 @@ export default function App() {
   const sessStore = useSessionStore();
   const { currentSessionId } = sessStore;
 
-  // Listen for Wails events
+  // Load session list on mount
+  useEffect(() => {
+    window.go?.desktop?.App?.ListSessions?.(100)
+      .then((list) => {
+        if (list) sessStore.setSessions(list);
+      })
+      .catch(console.error);
+  }, []);
+
   useEffect(() => {
     const handleDelta = (_: unknown, text: string) => {
       appendDelta(text);
@@ -59,9 +67,23 @@ export default function App() {
       addRestoredMessage({ role: "assistant", content: `Error: ${err}` });
       setStreaming(false);
     };
-    const handleDone = () => {
+    const handleDone = (_: unknown, payload?: { response?: string; duration?: number }) => {
       const state = useChatStore.getState();
-      finalizeResponse(state.currentDelta, 0);
+      finalizeResponse(state.currentDelta, payload?.duration || 0);
+      // Save session to backend, then update sidebar item in-place
+      const sid = useSessionStore.getState().currentSessionId;
+      if (sid) {
+        const msgs = useChatStore.getState().messages.map((m) => ({
+          role: m.role, content: m.content, thinking: m.thinking || "",
+          toolLines: (m.toolCalls || []).map((tc) => tc.name + "(" + tc.args + ")"),
+          tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0,
+        }));
+        window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).then(() => {
+          // Find last user message for sidebar display
+          const lastUser = [...useChatStore.getState().messages].reverse().find((m) => m.role === "user");
+          useSessionStore.getState().updateSession(sid, lastUser?.content || "");
+        }).catch(console.error);
+      }
     };
     const handleUsage = (_: unknown, usage: { promptTokens: number; completionTokens: number; totalTokens: number }) => {
       setUsage(usage);
@@ -159,6 +181,15 @@ export default function App() {
           sessionId = await window.go?.desktop?.App?.CreateNewSession?.(activeWs);
           if (sessionId) {
             useSessionStore.getState().setCurrentSessionId(sessionId);
+            useSessionStore.getState().addSession({
+              id: sessionId,
+              workspaceId: activeWs,
+              modelName: currentModel,
+              userName: "",
+              lastMessage: message.slice(0, 80),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
           }
         } catch (e) {
           console.error("Failed to create session:", e);
@@ -203,6 +234,10 @@ export default function App() {
         const data = await window.go?.desktop?.App?.LoadSession?.(id);
         if (!data) return;
 
+        // Clear existing messages before loading new session
+        clearMessages();
+        resetStreamState();
+
         sessStore.setCurrentSessionId(id);
 
         // Convert loaded messages to ChatMessage format
@@ -221,7 +256,7 @@ export default function App() {
         console.error("Failed to load session:", e);
       }
     },
-    [addRestoredMessage, sessStore]
+    [addRestoredMessage, sessStore, clearMessages, resetStreamState]
   );
 
   const handleDeleteSession = useCallback(

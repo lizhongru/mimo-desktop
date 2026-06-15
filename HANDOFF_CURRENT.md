@@ -70,6 +70,17 @@ e5ad79a feat: real LLM execution for sub-agents (actors)
 
 ---
 
+
+### 3.5 会话导出增强 — Markdown 导出（当前提交）
+- **LeftSidebar.tsx**：会话右键菜单新增"导出对话"选项（Download 图标）。
+  - ContextMenu 组件新增 onExport prop，仅在有 sessionId 时显示。
+  - LeftSidebar 函数解构 onExportSession 并传入 ContextMenu。
+  - 点击后调用已有的 handleExportSession → 后端 ExportChat 导出为 .md 文件。
+- 后端 desktop/app_chat.go 的 ExportChat 方法已支持 Markdown 格式（标题、角色 emoji、时间戳）。
+- 导出流程：加载会话消息 → 转为 ExportMessage → 调用系统保存对话框 → 写入 .md 文件。
+
+---
+
 ## 4. 验证状态
 
 - `cd desktop/frontend; vite build` — ✓ built in ~5-10s，主包 460KB
@@ -98,7 +109,7 @@ e5ad79a feat: real LLM execution for sub-agents (actors)
 ### 高优先级
 1. **Skill 系统对接**：Dream/Distill 产出应落盘为 `.mimo/skills/` 下的 skill 文件。
 2. **MCP 工具在 actor 可用**：确认 `llmExecutor` 是否包含 MCP 工具定义，当前 `e.tools.Definitions()` 应已包含，需实际测试验证。
-3. **会话导出增强**：支持 Markdown 格式导出（当前只有纯文本）。
+3. ~~**会话导出增强**~~ ✅ 已完成：左侧栏右键菜单可导出 Markdown。
 
 ### 中优先级
 4. **输入历史记录**：上下箭头翻阅历史消息。
