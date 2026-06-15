@@ -15,6 +15,7 @@ const (
 	TaskBlocked    TaskStatus = "blocked"
 	TaskDone       TaskStatus = "done"
 	TaskAbandoned  TaskStatus = "abandoned"
+	TaskArchived   TaskStatus = "archived"
 )
 
 // Task represents a tracking task
@@ -52,10 +53,13 @@ func NewRegistry(db *sql.DB) *Registry {
 
 // Create creates a new task
 func (r *Registry) Create(sessionID, summary string, parentID *string) (*Task, error) {
-	id := fmt.Sprintf("T%d", time.Now().UnixNano())
+	id, err := r.nextID(sessionID, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate task ID: %w", err)
+	}
 	now := time.Now().Unix()
 
-	_, err := r.db.Exec(`
+	_, err = r.db.Exec(`
 		INSERT INTO tasks (id, session_id, parent_task_id, status, summary, created_at, last_event_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, id, sessionID, parentID, TaskOpen, summary, now, now)
@@ -95,7 +99,7 @@ func (r *Registry) List(sessionID string, status *TaskStatus, includeTerminal bo
 		args = append(args, *status)
 	} else if !includeTerminal {
 		query += ` AND status NOT IN (?, ?)`
-		args = append(args, TaskDone, TaskAbandoned)
+		args = append(args, TaskDone, TaskAbandoned, TaskArchived)
 	}
 
 	query += ` ORDER BY created_at ASC`
@@ -183,6 +187,64 @@ func (r *Registry) Abandon(id, eventSummary string) (*Task, error) {
 	}
 	r.addEvent(id, "abandoned", eventSummary)
 	return r.Get(id)
+}
+
+// nextID generates the next tree-style task ID.
+func (r *Registry) nextID(sessionID string, parentID *string) (string, error) {
+	if parentID == nil {
+		var maxN int
+		err := r.db.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTR(id, 2) AS INTEGER)), 0) FROM tasks WHERE session_id = ? AND parent_task_id IS NULL`, sessionID).Scan(&maxN)
+		if err != nil {
+			maxN = 0
+		}
+		return fmt.Sprintf("T%d", maxN+1), nil
+	}
+
+	var maxN int
+	prefix := *parentID + "."
+	err := r.db.QueryRow(`SELECT COALESCE(MAX(CAST(SUBSTR(id, ?) AS INTEGER)), 0) FROM tasks WHERE session_id = ? AND parent_task_id = ?`, len(prefix)+1, sessionID, *parentID).Scan(&maxN)
+	if err != nil {
+		maxN = 0
+	}
+	return fmt.Sprintf("%s%d", prefix, maxN+1), nil
+}
+
+// Rename updates a task summary.
+func (r *Registry) Rename(id, newSummary string) (*Task, error) {
+	now := time.Now().Unix()
+	_, err := r.db.Exec(`UPDATE tasks SET summary = ?, last_event_at = ? WHERE id = ?`, newSummary, now, id)
+	if err != nil {
+		return nil, err
+	}
+	r.addEvent(id, "renamed", "Summary updated")
+	return r.Get(id)
+}
+
+// Archive marks a done/abandoned/blocked task as archived.
+func (r *Registry) Archive(id string) (*Task, error) {
+	now := time.Now().Unix()
+	_, err := r.db.Exec(`UPDATE tasks SET status = ?, last_event_at = ? WHERE id = ? AND status IN (?, ?, ?)`, TaskArchived, now, id, TaskDone, TaskAbandoned, TaskBlocked)
+	if err != nil {
+		return nil, err
+	}
+	r.addEvent(id, "archived", "Task archived")
+	return r.Get(id)
+}
+
+// Progress appends a progress event to a task.
+func (r *Registry) Progress(id, summary string) error {
+	if err := r.touch(id); err != nil {
+		return err
+	}
+	r.addEvent(id, "progress", summary)
+	return nil
+}
+
+// touch updates last_event_at for a task.
+func (r *Registry) touch(id string) error {
+	now := time.Now().Unix()
+	_, err := r.db.Exec("UPDATE tasks SET last_event_at = ? WHERE id = ?", now, id)
+	return err
 }
 
 // addEvent adds an event to a task

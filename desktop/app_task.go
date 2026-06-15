@@ -216,6 +216,41 @@ func (a *App) TaskGetEvents(taskID string) []TaskEventInfo {
 	return result
 }
 
+// TaskRename updates a task summary.
+func (a *App) TaskRename(id string, newSummary string) TaskResult {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	registry := task.NewRegistry(a.sessionStore.DB())
+	t, err := registry.Rename(id, newSummary)
+	if err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
+	return TaskResult{Success: true, Message: "Task renamed", Task: taskInfoFromTask(t)}
+}
+
+// TaskArchive archives a completed/abandoned/blocked task.
+func (a *App) TaskArchive(id string) TaskResult {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	registry := task.NewRegistry(a.sessionStore.DB())
+	t, err := registry.Archive(id)
+	if err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
+	return TaskResult{Success: true, Message: "Task archived", Task: taskInfoFromTask(t)}
+}
+
+// TaskProgress adds a progress event to a task.
+func (a *App) TaskProgress(id string, summary string) TaskResult {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	registry := task.NewRegistry(a.sessionStore.DB())
+	if err := registry.Progress(id, summary); err != nil {
+		return TaskResult{Success: false, Message: err.Error()}
+	}
+	return TaskResult{Success: true, Message: "Progress recorded"}
+}
+
 func taskInfoFromTask(t *task.Task) *TaskInfo {
 	if t == nil {
 		return nil
