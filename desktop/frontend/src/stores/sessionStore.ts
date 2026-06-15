@@ -5,6 +5,7 @@ export interface SessionItem {
   workspaceId: string;
   modelName: string;
   userName: string;
+  firstMessage: string;
   lastMessage: string;
   createdAt: string;
   updatedAt: string;
@@ -59,13 +60,27 @@ export const useSessionStore = create<SessionState>((set) => ({
   leftSidebarOpen: true,
   selectedWorkspace: loadSelectedWorkspace(),
 
-  setSessions: (sessions) => set({ sessions }),
+  setSessions: (sessions) =>
+    set({
+      sessions: sessions.map((session) => ({
+        ...session,
+        firstMessage: session.firstMessage || session.lastMessage || "",
+      })),
+    }),
   setWorkspaces: (workspaces) => set({ workspaces }),
   setCurrentSessionId: (id) => set({ currentSessionId: id }),
   setStreamingSessionId: (id) => set({ streamingSessionId: id }),
   setExportingSessionId: (id) => set({ exportingSessionId: id }),
   addSession: (session) =>
-    set((s) => ({ sessions: [session, ...s.sessions] })),
+    set((s) => ({
+      sessions: [
+        {
+          ...session,
+          firstMessage: session.firstMessage || session.lastMessage || "",
+        },
+        ...s.sessions,
+      ],
+    })),
   removeSession: (id) =>
     set((s) => ({
       sessions: s.sessions.filter((sess) => sess.id !== id),
@@ -101,3 +116,4 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({ selectedWorkspace: id });
   },
 }));
+

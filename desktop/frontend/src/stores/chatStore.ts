@@ -1,8 +1,10 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
+import { useSessionStore } from "./sessionStore";
 import type { ChatMessage, ToolCallEvent, AgentUsage, ConfirmAction } from "../lib/types";
 
 interface ChatState {
   messages: ChatMessage[];
+  activeSessionId: string | null;
   isStreaming: boolean;
   isThinking: boolean;
   currentThinking: string;
@@ -34,6 +36,7 @@ interface ChatState {
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
   resetStreamState: () => void;
+  setActiveSessionId: (id: string | null) => void;
   deleteMessage: (id: string) => void;
 }
 
@@ -44,6 +47,7 @@ function genId() {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
+  activeSessionId: null,
   isStreaming: false,
   isThinking: false,
   currentThinking: "",
@@ -62,6 +66,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
     set((state) => ({
       messages: [...state.messages, msg],
+      activeSessionId: useSessionStore.getState().currentSessionId,
       isStreaming: true,
       isThinking: false,
       currentThinking: "",
@@ -134,6 +139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
     set((s) => ({
       messages: [...s.messages, msg],
+      activeSessionId: null,
       isStreaming: false,
       isThinking: false,
       currentThinking: "",
@@ -152,6 +158,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearMessages: () =>
     set({
       messages: [],
+      activeSessionId: null,
       isStreaming: false,
       isThinking: false,
       currentThinking: "",
@@ -162,6 +169,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   resetStreamState: () =>
     set({
+      activeSessionId: null,
       isStreaming: false,
       isThinking: false,
       currentThinking: "",
@@ -169,6 +177,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentToolCalls: [],
     }),
 
+  setActiveSessionId: (id) => set({ activeSessionId: id }),
   deleteMessage: (id) =>
     set((state) => ({
       messages: state.messages.filter((m) => m.id !== id),

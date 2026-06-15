@@ -11,22 +11,32 @@ export function useAgent() {
   const activity = useActivityStore;
 
   useEffect(() => {
-    const unsubs: (() => void)[] = [];
+    const unsubs: (() => void) = [];
+
+    // Guard: only process events if session matches
+    const isActiveSession = () => {
+      const active = store.getState().activeSessionId;
+      const current = useSessionStore.getState().currentSessionId;
+      return !active || active === current;
+    };
 
     unsubs.push(
       EventsOn(EVENTS.DELTA, (...args: unknown[]) => {
+        if (!isActiveSession()) return;
         store.getState().appendDelta(args[0] as string);
       })
     );
 
     unsubs.push(
       EventsOn(EVENTS.THINKING, (...args: unknown[]) => {
+        if (!isActiveSession()) return;
         store.getState().appendThinking(args[0] as string);
       })
     );
 
     unsubs.push(
       EventsOn(EVENTS.TOOL_CALL, (...args: unknown[]) => {
+        if (!isActiveSession()) return;
         const name = args[0] as string;
         const toolArgs = args[1] as string;
         store.getState().addToolCall(name, toolArgs);
@@ -42,6 +52,7 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.TOOL_RESULT, (...args: unknown[]) => {
+        if (!isActiveSession()) return;
         const name = args[0] as string;
         const result = args[1] as string;
         store.getState().updateToolResult(name, result);
@@ -143,6 +154,18 @@ export function useAgent() {
     unsubs.push(
       EventsOn(EVENTS.CHAT_DONE, (...args: unknown[]) => {
         const data = args[0] as { response: string; duration: number };
+        const activeSid = store.getState().activeSessionId;
+        const currentSid = useSessionStore.getState().currentSessionId;
+        if (activeSid && activeSid !== currentSid) {
+          const msgs = store.getState().messages;
+          const response = data.response || store.getState().currentDelta;
+          const finalMsgs = [...msgs, { id: 'final-' + Date.now(), role: 'assistant' as const, content: response, thinking: store.getState().currentThinking || undefined, toolCalls: store.getState().currentToolCalls.length > 0 ? [...store.getState().currentToolCalls] : undefined, duration: data.duration, timestamp: Date.now() }];
+          const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+          window.go?.desktop?.App?.SaveSessionFromFrontend?.(activeSid, dto).catch(console.error);
+          store.getState().resetStreamState();
+          useSessionStore.getState().setStreamingSessionId(null);
+          return;
+        }
         store.getState().finalizeResponse(data.response, data.duration);
         useSessionStore.getState().setStreamingSessionId(null);
       })
@@ -158,6 +181,18 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.CHAT_CANCELLED, () => {
+        // Save partial content to the original session if user switched
+        const activeSid = store.getState().activeSessionId;
+        const currentSid = useSessionStore.getState().currentSessionId;
+        if (activeSid && activeSid !== currentSid) {
+          const partial = store.getState().currentDelta;
+          if (partial) {
+            const msgs = store.getState().messages;
+            const finalMsgs = [...msgs, { id: 'cancel-' + Date.now(), role: 'assistant' as const, content: partial + ' _(cancelled)_', thinking: store.getState().currentThinking || undefined, timestamp: Date.now() }];
+            const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: [], tokens: 0, toolCalls: 0, durationMs: 0 }));
+            window.go?.desktop?.App?.SaveSessionFromFrontend?.(activeSid, dto).catch(console.error);
+          }
+        }
         useSessionStore.getState().setStreamingSessionId(null);
         store.getState().resetStreamState();
       })

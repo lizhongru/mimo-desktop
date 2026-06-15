@@ -1,8 +1,9 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿﻿import { useEffect, useState, useRef } from "react";
 import {
   Plus,
   MessageSquare,
   Trash2,
+  Loader2,
   Download,
   FolderOpen,
   Settings,
@@ -160,6 +161,7 @@ function ContextMenu({
 function SessionItemRow({
   session,
   isActive,
+  isStreaming,
   isManageMode,
   isSelected,
   onLoad,
@@ -169,6 +171,7 @@ function SessionItemRow({
 }: {
   session: SessionItem;
   isActive: boolean;
+  isStreaming: boolean;
   isManageMode: boolean;
   isSelected: boolean;
   onLoad: (id: string) => void;
@@ -222,7 +225,11 @@ function SessionItemRow({
               : "text-txt-g group-hover:text-txt-2"
           }`}
         >
-          <MessageSquare className="h-3.5 w-3.5" />
+          {isStreaming ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-accent)]" />
+          ) : (
+            <MessageSquare className="h-3.5 w-3.5" />
+          )}
         </div>
       )}
       <div className="flex min-w-0 flex-1 items-center gap-2 pr-7">
@@ -266,6 +273,7 @@ export function LeftSidebar({
 }: Props) {
   const sessions = useSessionStore((s) => s.sessions);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
+  const streamingSessionId = useSessionStore((s) => s.streamingSessionId);
   const selectedWorkspace = useSessionStore((s) => s.selectedWorkspace);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const workspaces = useSessionStore((s) => s.workspaces);
@@ -434,6 +442,7 @@ export function LeftSidebar({
       key={session.id}
       session={session}
       isActive={currentSessionId === session.id}
+      isStreaming={streamingSessionId === session.id}
       isManageMode={manageMode}
       isSelected={selectedIds.has(session.id)}
       onLoad={onLoadSession}
@@ -933,3 +942,18 @@ export function LeftSidebar({
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -51,123 +51,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleDelta = (_: unknown, text: string) => {
-      appendDelta(text);
-    };
-    const handleThinking = (_: unknown, delta: string) => {
-      appendThinking(delta);
-    };
-    const handleToolCall = (_: unknown, name: string, args: string) => {
-      addToolCall(name, args);
-    };
-    const handleToolResult = (_: unknown, name: string, result: string) => {
-      updateToolResult(name, result);
-    };
-    const handleError = (_: unknown, err: string) => {
-      addRestoredMessage({ role: "assistant", content: `Error: ${err}` });
-      setStreaming(false);
-    };
-    const handleDone = () => {
-      // finalizeResponse is handled by useAgent.ts; here we only save + update sidebar
-      const sid = useSessionStore.getState().currentSessionId;
-      if (sid) {
-        // Wait a tick for finalizeResponse in useAgent to finish
-        setTimeout(() => {
-          const msgs = useChatStore.getState().messages.map((m) => ({
-            role: m.role, content: m.content, thinking: m.thinking || "",
-            toolLines: (m.toolCalls || []).map((tc) => tc.name + "(" + tc.args + ")"),
-            tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0,
-          }));
-          window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).then(() => {
-            const lastUser = [...useChatStore.getState().messages].reverse().find((m) => m.role === "user");
-            useSessionStore.getState().updateSession(sid, lastUser?.content || "");
-          }).catch(console.error);
-        }, 50);
-      }
-    };
-    const handleUsage = (_: unknown, usage: { promptTokens: number; completionTokens: number; totalTokens: number }) => {
-      setUsage(usage);
-    };
-    const handleCompressing = () => {
-      setCompressing(true);
-    };
-    const handleCompressed = (_: unknown, result: { before: number; after: number }) => {
-      setCompressing(false);
-      if (result) {
-        addRestoredMessage({
-          role: "assistant",
-          content: `Context compressed: ${result.before} → ${result.after} tokens`,
-        });
-      }
-    };
-    const handleSafetyConfirm = (_: unknown, action: { level: string; description: string; tool: string; params: Record<string, unknown> }) => {
-      setConfirmAction(action);
-    };
-    const handlePlanning = (_: unknown, message: string) => {
-      useActivityStore.getState().addEntry({
-        type: "plan_step",
-        name: "Planning",
-        status: "running",
-        detail: message,
-      });
-    };
-    const handlePlanGenerated = (_: unknown, plan: { goal: string; steps: Array<{ id: string; description: string; status: string }> }) => {
-      useActivityStore.getState().setPlan({
-        goal: plan.goal,
-        currentStep: 0,
-        totalSteps: plan.steps.length,
-        steps: plan.steps.map((s) => ({
-          id: Number(s.id) || 0,
-          description: s.description,
-          status: (s.status as "pending" | "in_progress" | "completed" | "failed" | "skipped") || "pending",
-        })),
-      });
-    };
-    const handlePlanStepStart = (_: unknown, step: { id: string; description: string; status: string }) => {
-      useActivityStore.getState().updatePlanStep(Number(step.id) || 0, "in_progress");
-    };
-    const handlePlanStepDone = (_: unknown, step: { id: string; description: string; status: string }) => {
-      useActivityStore.getState().updatePlanStep(
-        Number(step.id) || 0,
-        (step.status as "completed" | "failed") || "completed"
-      );
-    };
+    // Event handlers are now in useAgent.ts with session-id guards
+  }, []);
 
-    // Subscribe to events
-    window.runtime.EventsOn("chat:delta", handleDelta);
-    window.runtime.EventsOn("chat:thinking", handleThinking);
-    window.runtime.EventsOn("chat:tool_call", handleToolCall);
-    window.runtime.EventsOn("chat:tool_result", handleToolResult);
-    window.runtime.EventsOn("chat:error", handleError);
-    window.runtime.EventsOn("chat:done", handleDone);
-    window.runtime.EventsOn("chat:usage", handleUsage);
-    window.runtime.EventsOn("chat:compressing", handleCompressing);
-    window.runtime.EventsOn("chat:compressed", handleCompressed);
-    window.runtime.EventsOn("safety:confirm", handleSafetyConfirm);
-    window.runtime.EventsOn("agent:planning", handlePlanning);
-    window.runtime.EventsOn("agent:plan_generated", handlePlanGenerated);
-    window.runtime.EventsOn("agent:plan_step_start", handlePlanStepStart);
-    window.runtime.EventsOn("agent:plan_step_done", handlePlanStepDone);
-
-    return () => {
-      window.runtime.EventsOff(
-        "chat:delta",
-        "chat:thinking",
-        "chat:tool_call",
-        "chat:tool_result",
-        "chat:error",
-        "chat:done",
-        "chat:usage",
-        "chat:compressing",
-        "chat:compressed",
-        "safety:confirm",
-        "agent:planning",
-        "agent:plan_generated",
-        "agent:plan_step_start",
-        "agent:plan_step_done"
-      );
-    };
-  }, [addRestoredMessage, appendDelta, appendThinking, addToolCall, updateToolResult, setStreaming, setConfirmAction, setCompressing, setUsage, finalizeResponse]);
 
   const handleSend = useCallback(
     async (message: string, attachments?: string) => {
@@ -203,6 +89,7 @@ export default function App() {
       }
 
       addUserMessage(message);
+      useSessionStore.getState().setStreamingSessionId(useSessionStore.getState().currentSessionId);
       try {
         await window.go?.desktop?.App?.SendMessage?.(message, attachments || "");
       } catch (e) {
@@ -234,9 +121,12 @@ export default function App() {
         const data = await window.go?.desktop?.App?.LoadSession?.(id);
         if (!data) return;
 
-        // Clear existing messages before loading new session
-        clearMessages();
-        resetStreamState();
+        // If another session is streaming, let it finish in background
+        // Only clear if no active streaming
+        if (!useChatStore.getState().isStreaming || useChatStore.getState().activeSessionId === id) {
+          clearMessages();
+          resetStreamState();
+        }
 
         sessStore.setCurrentSessionId(id);
 
@@ -418,3 +308,5 @@ export default function App() {
     </>
   );
 }
+
+

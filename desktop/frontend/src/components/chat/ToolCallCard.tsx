@@ -9,13 +9,21 @@ interface Props {
 }
 
 function parseArgs(argsStr: string): Record<string, string> {
+  if (!argsStr) {
+    return { raw: "" };
+  }
+
   try {
     const obj = JSON.parse(argsStr);
-    const result: Record<string, string> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      result[k] = typeof v === "string" ? v : JSON.stringify(v);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      const result: Record<string, string> = {};
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        result[k] = typeof v === "string" ? v : JSON.stringify(v);
+      }
+      return result;
     }
-    return result;
+
+    return { raw: typeof obj === "string" ? obj : JSON.stringify(obj) };
   } catch {
     return { raw: argsStr };
   }
@@ -101,3 +109,4 @@ export function ToolCallCard({ toolCall }: Props) {
     </div>
   );
 }
+

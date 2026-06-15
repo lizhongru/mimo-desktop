@@ -21,9 +21,7 @@ export function MessageList() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    // Use instant for session load (large batch), smooth for streaming
     const behavior = "smooth";
-    // Double-rAF to ensure DOM is painted
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         el.scrollTo({ top: el.scrollHeight, behavior });
@@ -37,10 +35,10 @@ export function MessageList() {
       className={`flex-1 overflow-y-auto px-6 py-4 ${messages.length > 0 || isStreaming ? "space-y-1" : ""}`}
     >
       {messages.length === 0 && !isStreaming && (
-        <div className="flex flex-col items-center justify-center h-full text-txt-g -mt-4">
-          <div className="text-4xl font-bold text-accent/60 mb-3">MiMo</div>
+        <div className="flex flex-col items-center justify-center h-full text-[var(--text-ghost)] -mt-4">
+          <div className="text-4xl font-bold text-[var(--color-accent)]/60 mb-3">MiMo</div>
           <p className="text-sm">{t("app_subtitle")}</p>
-          <p className="text-xs mt-1 text-txt-m">
+          <p className="text-xs mt-1 text-[var(--text-muted)]">
             {t("empty_hint")}
           </p>
         </div>
@@ -50,35 +48,27 @@ export function MessageList() {
         <MessageBubble key={msg.id} message={msg} />
       ))}
 
-      {/* Streaming in-progress content */}
       {isStreaming && (
         <div className="flex gap-3 py-3">
-          <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <span className="w-4 h-4 text-accent text-center text-xs flex items-center justify-center font-semibold">
+          <div className="w-7 h-7 rounded-full bg-[var(--sidebar-accent-soft)] flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span className="w-4 h-4 text-[var(--color-accent)] text-center text-xs flex items-center justify-center font-semibold">
               M
             </span>
           </div>
 
-          <div className="max-w-[80%] rounded-lg px-4 py-2.5 bg-elevated/60 text-sm text-txt">
-            {/* Live thinking */}
-            {currentThinking && <ThinkingBlock content={currentThinking} />}
+          <div className="max-w-[80%] rounded-2xl px-4 py-2.5 border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] shadow-sm">
+            {(currentThinking || isThinking) && <ThinkingBlock content={currentThinking} isLive />}
 
-            {/* Live tool calls */}
             {currentToolCalls.map((tc) => (
               <ToolCallCard key={tc.id} toolCall={tc} />
             ))}
 
-            {/* Live delta text */}
             {currentDelta && (
               <div className="whitespace-pre-wrap">{currentDelta}</div>
             )}
 
-            {/* Spinner when no content yet */}
             {!currentDelta && !currentThinking && currentToolCalls.length === 0 && (
-              <span className="text-txt-m text-xs flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {t("status_thinking")}
-              </span>
+              <ThinkingBlock content="" isLive />
             )}
           </div>
         </div>
