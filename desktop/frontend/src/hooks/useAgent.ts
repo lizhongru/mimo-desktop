@@ -145,24 +145,6 @@ export function useAgent() {
         const data = args[0] as { response: string; duration: number };
         store.getState().finalizeResponse(data.response, data.duration);
         useSessionStore.getState().setStreamingSessionId(null);
-        // Auto-save session
-        try {
-          const msgs = store.getState().messages;
-          const sid = useSessionStore.getState().currentSessionId;
-          if (sid && msgs.length > 0) {
-            // workingDir is no longer passed - backend reads it from session record
-            window.go?.desktop?.App?.SaveSessionFromFrontend?.(sid, msgs).then(() => {
-              // Refresh session list so the new session appears in sidebar
-              window.go?.desktop?.App?.ListSessions?.(30).then((list) => {
-                useSessionStore.getState().setSessions(list || []);
-              }).catch(console.error);
-            }).catch((err) => {
-              console.warn("Auto-save session failed:", err);
-            });
-          }
-        } catch (e) {
-          console.warn("Auto-save error:", e);
-        }
       })
     );
 
