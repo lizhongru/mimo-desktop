@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -56,15 +57,12 @@ func (d *Distill) Analyze(sessionData string) ([]SkillCandidate, error) {
 
 	var candidates []SkillCandidate
 
-	// Detect repeated command patterns
 	commands := d.detectCommandPatterns(sessionData)
 	candidates = append(candidates, commands...)
 
-	// Detect workflow patterns
 	workflows := d.detectWorkflowPatterns(sessionData)
 	candidates = append(workflows, candidates...)
 
-	// Filter by confidence
 	var filtered []SkillCandidate
 	for _, c := range candidates {
 		if c.Confidence >= d.config.MinConfidence {
@@ -72,7 +70,6 @@ func (d *Distill) Analyze(sessionData string) ([]SkillCandidate, error) {
 		}
 	}
 
-	// Limit candidates
 	if len(filtered) > d.config.MaxCandidates {
 		filtered = filtered[:d.config.MaxCandidates]
 	}
@@ -80,12 +77,10 @@ func (d *Distill) Analyze(sessionData string) ([]SkillCandidate, error) {
 	return filtered, nil
 }
 
-// detectCommandPatterns detects repeated command patterns
 func (d *Distill) detectCommandPatterns(data string) []SkillCandidate {
 	var candidates []SkillCandidate
 	lines := strings.Split(data, "\n")
 
-	// Count command occurrences
 	cmdCount := make(map[string]int)
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -94,7 +89,6 @@ func (d *Distill) detectCommandPatterns(data string) []SkillCandidate {
 			cmdCount[cmd]++
 		}
 	}
-	// Also check for lines that look like commands (start with common command prefixes)
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "go ") ||
@@ -106,13 +100,12 @@ func (d *Distill) detectCommandPatterns(data string) []SkillCandidate {
 		}
 	}
 
-	// Create candidates for repeated commands
 	for cmd, count := range cmdCount {
 		if count >= 2 {
 			candidates = append(candidates, SkillCandidate{
 				Name:        fmt.Sprintf("skill_%s", sanitizeName(cmd)),
 				Description: fmt.Sprintf("Automated skill for: %s", cmd),
-				Confidence:  float64(count) / 10.0, // Simple confidence score
+				Confidence:  float64(count) / 10.0,
 				Pattern:     cmd,
 				Commands:    []string{cmd},
 				CreatedAt:   time.Now(),
@@ -123,12 +116,10 @@ func (d *Distill) detectCommandPatterns(data string) []SkillCandidate {
 	return candidates
 }
 
-// detectWorkflowPatterns detects workflow patterns
 func (d *Distill) detectWorkflowPatterns(data string) []SkillCandidate {
 	var candidates []SkillCandidate
 	lines := strings.Split(data, "\n")
 
-	// Detect common workflows
 	workflowPatterns := []struct {
 		keywords []string
 		name     string
@@ -176,7 +167,7 @@ func (d *Distill) detectWorkflowPatterns(data string) []SkillCandidate {
 	return candidates
 }
 
-// SaveCandidates saves skill candidates to a file
+// SaveCandidates saves skill candidates to candidates.md and individual SKILL.md files.
 func (d *Distill) SaveCandidates(candidates []SkillCandidate) error {
 	if len(candidates) == 0 {
 		return nil
@@ -187,6 +178,17 @@ func (d *Distill) SaveCandidates(candidates []SkillCandidate) error {
 		return fmt.Errorf("failed to create skill dir: %w", err)
 	}
 
+	if err := d.writeCandidatesFile(skillDir, candidates); err != nil {
+		return err
+	}
+	if err := d.writeSkillFiles(skillDir, candidates); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Distill) writeCandidatesFile(skillDir string, candidates []SkillCandidate) error {
 	skillFile := filepath.Join(skillDir, "candidates.md")
 
 	var content strings.Builder
@@ -194,7 +196,7 @@ func (d *Distill) SaveCandidates(candidates []SkillCandidate) error {
 	content.WriteString(fmt.Sprintf("Generated: %s\n\n", time.Now().Format(time.RFC3339)))
 
 	for _, c := range candidates {
-		content.WriteString(fmt.Sprintf("## %s\n\n", c.Name))
+		content.WriteString(fmt.Sprintf("## %s\n\n", normalizeSkillName(c.Name)))
 		content.WriteString(fmt.Sprintf("- **Description**: %s\n", c.Description))
 		content.WriteString(fmt.Sprintf("- **Confidence**: %.2f\n", c.Confidence))
 		if c.Pattern != "" {
@@ -212,9 +214,108 @@ func (d *Distill) SaveCandidates(candidates []SkillCandidate) error {
 	return os.WriteFile(skillFile, []byte(content.String()), 0644)
 }
 
-// Run executes the distill process on session history
+func (d *Distill) writeSkillFiles(skillDir string, candidates []SkillCandidate) error {
+	for _, candidate := range candidates {
+		name := normalizeSkillName(candidate.Name)
+		candidateDir := filepath.Join(skillDir, name)
+		if err := os.MkdirAll(candidateDir, 0755); err != nil {
+			return fmt.Errorf("failed to create skill candidate dir %s: %w", name, err)
+		}
+
+		content := renderSkillFile(name, candidate)
+		skillFile := filepath.Join(candidateDir, "SKILL.md")
+		if err := os.WriteFile(skillFile, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to write skill file %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func renderSkillFile(name string, candidate SkillCandidate) string {
+	var content strings.Builder
+	content.WriteString("---\n")
+	content.WriteString(fmt.Sprintf("name: %s\n", name))
+	content.WriteString(fmt.Sprintf("description: %s\n", candidate.Description))
+	content.WriteString(fmt.Sprintf("confidence: %.2f\n", candidate.Confidence))
+	content.WriteString("source: distill\n")
+	content.WriteString("---\n\n")
+	content.WriteString("# ")
+	content.WriteString(name)
+	content.WriteString("\n\n")
+	content.WriteString(candidate.Description)
+	content.WriteString("\n\n")
+	content.WriteString("## Pattern\n\n")
+	if candidate.Pattern == "" {
+		content.WriteString("No command pattern captured.\n\n")
+	} else {
+		content.WriteString("```text\n")
+		content.WriteString(candidate.Pattern)
+		content.WriteString("\n```\n\n")
+	}
+	content.WriteString("## Commands\n\n")
+	if len(candidate.Commands) == 0 {
+		content.WriteString("No commands captured.\n")
+	} else {
+		for _, cmd := range candidate.Commands {
+			content.WriteString("- `")
+			content.WriteString(cmd)
+			content.WriteString("`\n")
+		}
+	}
+	return content.String()
+}
+
+// ParseCandidatesMarkdown parses candidates.md generated by SaveCandidates.
+func ParseCandidatesMarkdown(data []byte) []SkillCandidate {
+	var candidates []SkillCandidate
+	var current *SkillCandidate
+	inCommands := false
+
+	flush := func() {
+		if current != nil && current.Name != "" {
+			candidates = append(candidates, *current)
+		}
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") {
+			flush()
+			current = &SkillCandidate{Name: strings.TrimSpace(strings.TrimPrefix(trimmed, "## "))}
+			inCommands = false
+			continue
+		}
+		if current == nil {
+			continue
+		}
+
+		switch {
+		case strings.HasPrefix(trimmed, "- **Description**:"):
+			current.Description = strings.TrimSpace(strings.TrimPrefix(trimmed, "- **Description**:"))
+			inCommands = false
+		case strings.HasPrefix(trimmed, "- **Confidence**:"):
+			value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- **Confidence**:"))
+			if confidence, err := strconv.ParseFloat(value, 64); err == nil {
+				current.Confidence = confidence
+			}
+			inCommands = false
+		case strings.HasPrefix(trimmed, "- **Pattern**:"):
+			current.Pattern = strings.TrimSpace(strings.TrimPrefix(trimmed, "- **Pattern**:"))
+			inCommands = false
+		case strings.HasPrefix(trimmed, "- **Commands**:"):
+			inCommands = true
+		case inCommands && strings.HasPrefix(trimmed, "- `"):
+			command := strings.TrimPrefix(trimmed, "- `")
+			command = strings.TrimSuffix(command, "`")
+			current.Commands = append(current.Commands, command)
+		}
+	}
+	flush()
+
+	return candidates
+}
+
 func (d *Distill) Run(sessionDir string) (int, error) {
-	// Read session files
 	sessionFile := filepath.Join(sessionDir, "checkpoint.md")
 	data, err := os.ReadFile(sessionFile)
 	if err != nil {
@@ -224,13 +325,11 @@ func (d *Distill) Run(sessionDir string) (int, error) {
 		return 0, fmt.Errorf("failed to read session: %w", err)
 	}
 
-	// Analyze for candidates
 	candidates, err := d.Analyze(string(data))
 	if err != nil {
 		return 0, err
 	}
 
-	// Save candidates
 	if err := d.SaveCandidates(candidates); err != nil {
 		return 0, err
 	}
@@ -238,9 +337,16 @@ func (d *Distill) Run(sessionDir string) (int, error) {
 	return len(candidates), nil
 }
 
-// sanitizeName sanitizes a string for use as a name
+func normalizeSkillName(s string) string {
+	name := sanitizeName(s)
+	name = strings.Trim(name, "_")
+	if name == "" {
+		return "skill_candidate"
+	}
+	return name
+}
+
 func sanitizeName(s string) string {
-	// Replace special characters with underscores
 	reg := strings.NewReplacer(
 		" ", "_",
 		"-", "_",
@@ -249,7 +355,6 @@ func sanitizeName(s string) string {
 		".", "_",
 	)
 	result := reg.Replace(s)
-	// Truncate if too long
 	if len(result) > 50 {
 		result = result[:50]
 	}

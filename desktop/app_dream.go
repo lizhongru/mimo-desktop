@@ -78,25 +78,24 @@ func (a *App) DistillRun() DreamResult {
 // DistillListCandidates returns skill candidates
 func (a *App) DistillListCandidates() []SkillCandidateInfo {
 	wd, _ := os.Getwd()
-	skillDir := filepath.Join(wd, ".mimo", "skills")
-	skillFile := filepath.Join(skillDir, "candidates.md")
+	skillFile := filepath.Join(wd, ".mimo", "skills", "candidates.md")
 
-	// Check if file exists
-	if _, err := os.Stat(skillFile); os.IsNotExist(err) {
-		return []SkillCandidateInfo{}
-	}
-
-	// Read and parse the file (simplified parsing)
 	data, err := os.ReadFile(skillFile)
 	if err != nil {
 		return []SkillCandidateInfo{}
 	}
 
-	// Simple parsing - in real implementation, use proper markdown parsing
-	var candidates []SkillCandidateInfo
-	lines := []byte(data)
-	_ = lines // Placeholder for actual parsing
+	parsed := skill.ParseCandidatesMarkdown(data)
+	candidates := make([]SkillCandidateInfo, 0, len(parsed))
+	for _, candidate := range parsed {
+		candidates = append(candidates, SkillCandidateInfo{
+			Name:        candidate.Name,
+			Description: candidate.Description,
+			Confidence:  candidate.Confidence,
+			Pattern:     candidate.Pattern,
+			Commands:    candidate.Commands,
+		})
+	}
 
-	// Return empty for now - would need proper markdown parsing
 	return candidates
 }

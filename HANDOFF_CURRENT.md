@@ -67,7 +67,13 @@ c20f0c1 fix: scroll to bottom after loading session messages
 - 代码块背景、边框、复制按钮背景新增亮/暗主题变量。
 - 使用 `customStyle` / `codeTagProps` 强制覆盖 `SyntaxHighlighter` 内部背景，修复代码块外圈黑底问题。
 
-### 3.7 清理与文档
+### 3.7 Skill Distill 最小闭环
+- `internal/skill` 新增 `ParseCandidatesMarkdown`，可解析 `.mimo/skills/candidates.md` 中的候选名称、描述、置信度、模式和命令。
+- `SaveCandidates` 现在同时写候选总览 `.mimo/skills/candidates.md` 和每个候选的 `.mimo/skills/<skill-name>/SKILL.md`。
+- 生成的 `SKILL.md` 包含 frontmatter、置信度、来源、模式和命令，便于后续接入技能安装/确认流程。
+- `DistillListCandidates` 已从 placeholder 改为真实解析候选文件并返回给桌面端。
+
+### 3.8 清理与文档
 - 清理 `App.tsx` 中不再使用的事件 selector 和空 `useEffect`。
 - 更新 `docs/workspace-architecture.md` 中的 `SessionDTO` 字段说明。
 - 更新 Wails TypeScript model 中的 `SessionDTO.firstMessage`。
@@ -93,6 +99,10 @@ c20f0c1 fix: scroll to bottom after loading session messages
 | `internal/session/store.go` | `first_message` 数据库迁移、查询与保存逻辑 |
 | `desktop/frontend/src/wails/wailsjs/go/models.ts` | Wails model 增加 `firstMessage` |
 | `docs/workspace-architecture.md` | 文档同步 `SessionDTO.firstMessage` |
+| `internal/skill/distill.go` | Distill 候选解析、候选总览和独立 `SKILL.md` 落盘 |
+| `internal/skill/distill_test.go` | 覆盖候选解析和 `SKILL.md` 生成 |
+| `desktop/app_dream.go` | `DistillListCandidates` 使用真实候选解析器 |
+| `docs/superpowers/plans/2026-06-16-skill-distill-files.md` | Skill Distill 最小闭环实施计划 |
 
 ---
 
@@ -102,7 +112,7 @@ c20f0c1 fix: scroll to bottom after loading session messages
 
 ```text
 cd desktop/frontend; npm run build
-cd D:\works\study\mimo cli; go test ./desktop/... ./internal/session/... -count=1
+cd D:\works\study\mimo cli; go test ./desktop/... ./internal/session/... ./internal/skill -count=1
 ```
 
 已知构建输出仍有历史警告：
@@ -132,7 +142,7 @@ cd D:\works\study\mimo cli; go test ./desktop/... ./internal/session/... -count=
 ## 8. 建议下一步
 
 ### 高优先级
-1. **Skill 系统对接**：Dream/Distill 产出落盘为 `.mimo/skills/` 下的 skill 文件。
+1. **Skill 安装确认流程**：基于已落盘的 `.mimo/skills/<name>/SKILL.md`，增加前端确认/启用/删除入口。
 2. **输入历史记录完善**：当前 `ChatInput` 有基础上下键历史，可继续做跨会话/持久化历史。
 3. **Token 预算警告**：状态栏提示上下文接近上限。
 
@@ -144,3 +154,4 @@ cd D:\works\study\mimo cli; go test ./desktop/... ./internal/session/... -count=
 ### 低优先级
 7. **PDF 预览**：FilePreviewModal 支持 PDF 渲染。
 8. **代码块体验增强**：显示语言标签、复制按钮常显开关、代码换行切换。
+
