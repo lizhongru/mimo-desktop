@@ -10,8 +10,24 @@ export function useAgent() {
   const store = useChatStore;
   const activity = useActivityStore;
 
+  const toFrontendDto = (messages: Array<{ role: string; content: string; thinking?: string; toolCalls?: Array<{ name: string; args: string }>; tokens?: number; duration?: number }>) =>
+    messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+      thinking: message.thinking || "",
+      toolLines: (message.toolCalls || []).map((toolCall) => toolCall.name + '(' + toolCall.args + ')'),
+      tokens: message.tokens || 0,
+      toolCalls: message.toolCalls?.length || 0,
+      durationMs: message.duration || 0,
+    }));
+
   useEffect(() => {
     const unsubs: (() => void) = [];
+
+    const isBackgroundSession = () => {
+      const state = store.getState();
+      return !!state.backgroundSessionId && state.backgroundSessionId !== useSessionStore.getState().currentSessionId;
+    };
 
     // Guard: only process events if session matches
     const isActiveSession = () => {
@@ -22,6 +38,10 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.DELTA, (...args: unknown[]) => {
+        if (isBackgroundSession()) {
+          store.getState().appendBackgroundDelta(args[0] as string);
+          return;
+        }
         if (!isActiveSession()) return;
         store.getState().appendDelta(args[0] as string);
       })
@@ -29,6 +49,10 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.THINKING, (...args: unknown[]) => {
+        if (isBackgroundSession()) {
+          store.getState().appendBackgroundThinking(args[0] as string);
+          return;
+        }
         if (!isActiveSession()) return;
         store.getState().appendThinking(args[0] as string);
       })
@@ -36,9 +60,13 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.TOOL_CALL, (...args: unknown[]) => {
-        if (!isActiveSession()) return;
         const name = args[0] as string;
         const toolArgs = args[1] as string;
+        if (isBackgroundSession()) {
+          store.getState().addBackgroundToolCall(name, toolArgs);
+          return;
+        }
+        if (!isActiveSession()) return;
         store.getState().addToolCall(name, toolArgs);
         // Add to activity log
         activity.getState().addEntry({
@@ -52,9 +80,13 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.TOOL_RESULT, (...args: unknown[]) => {
-        if (!isActiveSession()) return;
         const name = args[0] as string;
         const result = args[1] as string;
+        if (isBackgroundSession()) {
+          store.getState().updateBackgroundToolResult(name, result);
+          return;
+        }
+        if (!isActiveSession()) return;
         store.getState().updateToolResult(name, result);
         // Update activity log
         activity.getState().updateEntry(name, {
@@ -154,19 +186,27 @@ export function useAgent() {
     unsubs.push(
       EventsOn(EVENTS.CHAT_DONE, (...args: unknown[]) => {
         const data = args[0] as { response: string; duration: number };
-        const activeSid = store.getState().activeSessionId;
+        const state = store.getState();
+        const activeSid = state.activeSessionId;
+        const backgroundSid = state.backgroundSessionId;
         const currentSid = useSessionStore.getState().currentSessionId;
-        if (activeSid && activeSid !== currentSid) {
-          const msgs = store.getState().messages;
-          const response = data.response || store.getState().currentDelta;
-          const finalMsgs = [...msgs, { id: 'final-' + Date.now(), role: 'assistant' as const, content: response, thinking: store.getState().currentThinking || undefined, toolCalls: store.getState().currentToolCalls.length > 0 ? [...store.getState().currentToolCalls] : undefined, duration: data.duration, timestamp: Date.now() }];
+        const targetBackgroundSid = backgroundSid || (activeSid && activeSid !== currentSid ? activeSid : null);
+        if (targetBackgroundSid && targetBackgroundSid !== currentSid) {
+          const finalMsgs = store.getState().finalizeBackgroundResponse(data.response, data.duration);
+          store.getState().setSessionSnapshot(targetBackgroundSid, finalMsgs);
           const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
-          window.go?.desktop?.App?.SaveSessionFromFrontend?.(activeSid, dto).catch(console.error);
-          store.getState().resetStreamState();
+          window.go?.desktop?.App?.SaveSessionFromFrontend?.(targetBackgroundSid, dto).then(() => store.getState().clearSessionSnapshot(targetBackgroundSid)).catch(console.error);
           useSessionStore.getState().setStreamingSessionId(null);
           return;
         }
+        const currentState = store.getState();
+        const response = data.response || currentState.currentDelta;
+        const finalMsgs = [...currentState.messages, { id: 'final-' + Date.now(), role: 'assistant' as const, content: response, thinking: currentState.currentThinking || undefined, toolCalls: currentState.currentToolCalls.length > 0 ? [...currentState.currentToolCalls] : undefined, duration: data.duration, timestamp: Date.now() }];
         store.getState().finalizeResponse(data.response, data.duration);
+        if (currentSid) {
+          store.getState().setSessionSnapshot(currentSid, finalMsgs);
+          window.go?.desktop?.App?.SaveSessionFromFrontend?.(currentSid, toFrontendDto(finalMsgs)).then(() => store.getState().clearSessionSnapshot(currentSid)).catch(console.error);
+        }
         useSessionStore.getState().setStreamingSessionId(null);
       })
     );
@@ -174,23 +214,51 @@ export function useAgent() {
     unsubs.push(
       EventsOn(EVENTS.CHAT_ERROR, (...args: unknown[]) => {
         console.error("Chat error:", args[0]);
+        const state = store.getState();
+        const currentSid = useSessionStore.getState().currentSessionId;
+        if (state.backgroundSessionId && state.backgroundSessionId !== currentSid) {
+          const backgroundSid = state.backgroundSessionId;
+          const finalMsgs = state.finalizeBackgroundResponse(`${t("error_prefix")}: ${args[0]}`, 0);
+          store.getState().setSessionSnapshot(backgroundSid, finalMsgs);
+          const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+          window.go?.desktop?.App?.SaveSessionFromFrontend?.(backgroundSid, dto).then(() => store.getState().clearSessionSnapshot(backgroundSid)).catch(console.error);
+          useSessionStore.getState().setStreamingSessionId(null);
+          return;
+        }
+        const currentState = store.getState();
+        const finalMsgs = [...currentState.messages, { id: 'error-' + Date.now(), role: 'assistant' as const, content: `${t("error_prefix")}: ${args[0]}`, thinking: currentState.currentThinking || undefined, toolCalls: currentState.currentToolCalls.length > 0 ? [...currentState.currentToolCalls] : undefined, duration: 0, timestamp: Date.now() }];
         useSessionStore.getState().setStreamingSessionId(null);
         store.getState().finalizeResponse(`${t("error_prefix")}: ${args[0]}`, 0);
+        if (currentSid) {
+          store.getState().setSessionSnapshot(currentSid, finalMsgs);
+          window.go?.desktop?.App?.SaveSessionFromFrontend?.(currentSid, toFrontendDto(finalMsgs)).then(() => store.getState().clearSessionSnapshot(currentSid)).catch(console.error);
+        }
       })
     );
 
     unsubs.push(
       EventsOn(EVENTS.CHAT_CANCELLED, () => {
         // Save partial content to the original session if user switched
-        const activeSid = store.getState().activeSessionId;
+        const state = store.getState();
+        const activeSid = state.activeSessionId;
+        const backgroundSid = state.backgroundSessionId;
         const currentSid = useSessionStore.getState().currentSessionId;
-        if (activeSid && activeSid !== currentSid) {
-          const partial = store.getState().currentDelta;
-          if (partial) {
-            const msgs = store.getState().messages;
-            const finalMsgs = [...msgs, { id: 'cancel-' + Date.now(), role: 'assistant' as const, content: partial + ' _(cancelled)_', thinking: store.getState().currentThinking || undefined, timestamp: Date.now() }];
-            const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: [], tokens: 0, toolCalls: 0, durationMs: 0 }));
-            window.go?.desktop?.App?.SaveSessionFromFrontend?.(activeSid, dto).catch(console.error);
+        const targetBackgroundSid = backgroundSid || (activeSid && activeSid !== currentSid ? activeSid : null);
+        if (targetBackgroundSid && targetBackgroundSid !== currentSid) {
+          const finalMsgs = store.getState().cancelBackgroundResponse();
+          if (finalMsgs.length > 0) {
+            store.getState().setSessionSnapshot(targetBackgroundSid, finalMsgs);
+            const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+            window.go?.desktop?.App?.SaveSessionFromFrontend?.(targetBackgroundSid, dto).then(() => store.getState().clearSessionSnapshot(targetBackgroundSid)).catch(console.error);
+          }
+        }
+        if (!targetBackgroundSid) {
+          const currentState = store.getState();
+          const partial = currentState.currentDelta;
+          if (currentSid && partial) {
+            const finalMsgs = [...currentState.messages, { id: 'cancel-' + Date.now(), role: 'assistant' as const, content: `${partial} _(cancelled)_`, thinking: currentState.currentThinking || undefined, toolCalls: currentState.currentToolCalls.length > 0 ? [...currentState.currentToolCalls] : undefined, timestamp: Date.now() }];
+            store.getState().setSessionSnapshot(currentSid, finalMsgs);
+            window.go?.desktop?.App?.SaveSessionFromFrontend?.(currentSid, toFrontendDto(finalMsgs)).then(() => store.getState().clearSessionSnapshot(currentSid)).catch(console.error);
           }
         }
         useSessionStore.getState().setStreamingSessionId(null);

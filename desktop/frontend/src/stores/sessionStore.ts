@@ -36,7 +36,7 @@ interface SessionState {
   setExportingSessionId: (id: string | null) => void;
   addSession: (session: SessionItem) => void;
   removeSession: (id: string) => void;
-  updateSession: (id: string, lastMessage: string) => void;
+  updateSession: (id: string, lastMessage: string, firstMessage?: string) => void;
   updateSessionWorkspace: (id: string, workspaceId: string) => void;
   toggleLeftSidebar: () => void;
   setLeftSidebarOpen: (open: boolean) => void;
@@ -86,11 +86,16 @@ export const useSessionStore = create<SessionState>((set) => ({
       sessions: s.sessions.filter((sess) => sess.id !== id),
       currentSessionId: s.currentSessionId === id ? null : s.currentSessionId,
     })),
-  updateSession: (id, lastMessage) =>
+  updateSession: (id, lastMessage, firstMessage) =>
     set((s) => ({
       sessions: s.sessions.map((sess) =>
         sess.id === id
-          ? { ...sess, lastMessage, updatedAt: new Date().toISOString() }
+          ? {
+              ...sess,
+              lastMessage,
+              firstMessage: firstMessage ?? sess.firstMessage,
+              updatedAt: new Date().toISOString(),
+            }
           : sess
       ),
     })),

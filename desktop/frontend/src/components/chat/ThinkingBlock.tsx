@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from "react";
-import { ChevronDown, ChevronRight, Brain, Sparkles } from "lucide-react";
+﻿import { useState, type CSSProperties } from "react";
+import { ChevronDown, ChevronRight, Brain } from "lucide-react";
 import clsx from "clsx";
 import { t } from "../../lib/i18n";
 
@@ -8,20 +8,26 @@ interface Props {
   isLive?: boolean;
 }
 
+function DnaHelix() {
+  return (
+    <span className="dna-helix" aria-hidden="true">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <span
+          key={index}
+          className="dna-rung"
+          style={{ "--i": index } as CSSProperties}
+        >
+          <span className="dna-dot dna-dot-left" />
+          <span className="dna-bridge" />
+          <span className="dna-dot dna-dot-right" />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function ThinkingBlock({ content, isLive }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [dots, setDots] = useState("");
-
-  useEffect(() => {
-    if (!isLive) {
-      setDots("");
-      return;
-    }
-    const timer = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isLive]);
 
   if (!content && !isLive) return null;
 
@@ -48,24 +54,15 @@ export function ThinkingBlock({ content, isLive }: Props) {
           <ChevronRight className="w-3 h-3" />
         )}
 
-        <span className="relative flex h-4 w-4 items-center justify-center">
-          {isLive ? (
-            <>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-accent)] opacity-30" />
-              <Sparkles className="h-3.5 w-3.5 animate-pulse text-[var(--color-accent)]" />
-            </>
-          ) : (
-            <Brain className="h-3.5 w-3.5" />
-          )}
+        <span className="relative flex h-5 w-16 items-center justify-center">
+          {isLive ? <DnaHelix /> : <Brain className="h-3.5 w-3.5" />}
         </span>
 
-        <span className={clsx("italic", isLive && "font-medium")}>
-          {isLive && !content
-            ? `${t("thinking_label")}${dots}`
-            : expanded
-              ? t("thinking_label")
-              : preview || t("thinking_label")}
-        </span>
+        {!isLive && (
+          <span className="italic">
+            {expanded ? t("thinking_label") : preview || t("thinking_label")}
+          </span>
+        )}
       </button>
 
       {expanded && content && (

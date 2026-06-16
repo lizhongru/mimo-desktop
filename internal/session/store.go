@@ -36,13 +36,14 @@ type Workspace struct {
 
 // Session represents a conversation session
 type Session struct {
-	ID          string
-	WorkspaceID string
-	ModelName   string
-	UserName    string
-	LastMessage string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           string
+	WorkspaceID  string
+	ModelName    string
+	UserName     string
+	FirstMessage string
+	LastMessage  string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Message represents a single message in a session
@@ -239,6 +240,19 @@ func migrate(db *sql.DB) error {
 	`)
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id)")
 
+	// --- Migration v7: first_message on sessions ---
+	db.Exec("ALTER TABLE sessions ADD COLUMN first_message TEXT NOT NULL DEFAULT ''")
+	db.Exec(`UPDATE sessions
+		SET first_message = (
+			SELECT content FROM messages
+			WHERE messages.session_id = sessions.id AND messages.role = 'user'
+			ORDER BY messages.id ASC
+			LIMIT 1
+		)
+		WHERE (first_message IS NULL OR first_message = '') AND EXISTS (
+			SELECT 1 FROM messages WHERE messages.session_id = sessions.id AND messages.role = 'user'
+		)`)
+
 	return nil
 }
 
@@ -398,16 +412,31 @@ func (s *Store) SaveSession(id, workspaceID, modelName, userName string, message
 		}
 	}
 
+	// Preserve the earliest user message as display title
+	firstMsg := ""
+	if messages != nil {
+		for _, m := range messages {
+			if m.Role == "user" && strings.TrimSpace(m.Content) != "" {
+				firstMsg = m.Content
+				if len(firstMsg) > 200 {
+					firstMsg = firstMsg[:200]
+				}
+				break
+			}
+		}
+	}
+
 	// Upsert session
 	_, err = tx.Exec(`
-		INSERT INTO sessions (id, workspace_id, model_name, user_name, last_message, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO sessions (id, workspace_id, model_name, user_name, first_message, last_message, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			model_name = excluded.model_name,
 			user_name = excluded.user_name,
+			first_message = CASE WHEN excluded.first_message <> '' THEN excluded.first_message ELSE sessions.first_message END,
 			last_message = excluded.last_message,
 			updated_at = excluded.updated_at
-	`, id, workspaceID, modelName, userName, lastMsg, time.Now(), time.Now())
+	`, id, workspaceID, modelName, userName, firstMsg, lastMsg, time.Now(), time.Now())
 	if err != nil {
 		return err
 	}
@@ -441,9 +470,9 @@ func (s *Store) SaveSession(id, workspaceID, modelName, userName string, message
 func (s *Store) LoadSession(id string) (*Session, []Message, error) {
 	sess := &Session{}
 	err := s.db.QueryRow(`
-		SELECT id, workspace_id, model_name, user_name, last_message, created_at, updated_at
+		SELECT id, workspace_id, model_name, user_name, first_message, last_message, created_at, updated_at
 		FROM sessions WHERE id = ?
-	`, id).Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt)
+	`, id).Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.FirstMessage, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -477,7 +506,7 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, model_name, user_name, last_message, created_at, updated_at
+		SELECT id, workspace_id, model_name, user_name, first_message, last_message, created_at, updated_at
 		FROM sessions
 		ORDER BY updated_at DESC
 		LIMIT ?
@@ -490,7 +519,7 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 	var sessions []Session
 	for rows.Next() {
 		var sess Session
-		if err := rows.Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt); err != nil {
+		if err := rows.Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.FirstMessage, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sessions = append(sessions, sess)
@@ -504,7 +533,7 @@ func (s *Store) ListSessionsByWorkspace(workspaceID string, limit int) ([]Sessio
 		limit = 50
 	}
 	rows, err := s.db.Query(`
-		SELECT id, workspace_id, model_name, user_name, last_message, created_at, updated_at
+		SELECT id, workspace_id, model_name, user_name, first_message, last_message, created_at, updated_at
 		FROM sessions
 		WHERE workspace_id = ?
 		ORDER BY updated_at DESC
@@ -517,7 +546,7 @@ func (s *Store) ListSessionsByWorkspace(workspaceID string, limit int) ([]Sessio
 	var sessions []Session
 	for rows.Next() {
 		var sess Session
-		if err := rows.Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt); err != nil {
+		if err := rows.Scan(&sess.ID, &sess.WorkspaceID, &sess.ModelName, &sess.UserName, &sess.FirstMessage, &sess.LastMessage, &sess.CreatedAt, &sess.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sessions = append(sessions, sess)

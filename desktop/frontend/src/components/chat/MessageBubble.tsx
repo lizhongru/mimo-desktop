@@ -40,6 +40,21 @@ export function MessageBubble({ message }: Props) {
     }
   };
 
+  const hasActiveTextSelection = () => {
+    const selection = window.getSelection();
+    return !!selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+  };
+
+  const handleMouseEnter = () => {
+    if (hasActiveTextSelection()) return;
+    setHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (hasActiveTextSelection()) return;
+    setHovered(false);
+  };
+
   const handleRegenerate = () => {
     if (regenerating) {
       return;
@@ -59,8 +74,8 @@ export function MessageBubble({ message }: Props) {
         "group/msg relative flex gap-3 py-4",
         isUser && "justify-end"
       )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {!isUser && (
         <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sidebar-accent-soft)]">

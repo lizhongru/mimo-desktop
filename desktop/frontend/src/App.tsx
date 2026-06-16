@@ -6,6 +6,7 @@ import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useActivityStore } from "./stores/activityStore";
 import { t } from "./lib/i18n";
+import type { ChatMessage } from "./lib/types";
 
 const DEFAULT_WS = "default";
 
@@ -22,17 +23,14 @@ export default function App() {
   const messages = useChatStore((s) => s.messages);
   const addUserMessage = useChatStore((s) => s.addUserMessage);
   const addRestoredMessage = useChatStore((s) => s.addRestoredMessage);
-  const appendDelta = useChatStore((s) => s.appendDelta);
-  const appendThinking = useChatStore((s) => s.appendThinking);
-  const addToolCall = useChatStore((s) => s.addToolCall);
-  const updateToolResult = useChatStore((s) => s.updateToolResult);
-  const finalizeResponse = useChatStore((s) => s.finalizeResponse);
   const setStreaming = useChatStore((s) => s.setStreaming);
-  const setConfirmAction = useChatStore((s) => s.setConfirmAction);
   const setCompressing = useChatStore((s) => s.setCompressing);
-  const setUsage = useChatStore((s) => s.setUsage);
   const clearMessages = useChatStore((s) => s.clearMessages);
   const resetStreamState = useChatStore((s) => s.resetStreamState);
+  const stashCurrentStreamToBackground = useChatStore((s) => s.stashCurrentStreamToBackground);
+  const restoreBackgroundStream = useChatStore((s) => s.restoreBackgroundStream);
+  const getSessionSnapshot = useChatStore((s) => s.getSessionSnapshot);
+  const replaceMessages = useChatStore((s) => s.replaceMessages);
 
   // Check if current session has messages (for workspace switching)
   const hasMessages = messages.length > 0;
@@ -48,10 +46,6 @@ export default function App() {
         if (list) sessStore.setSessions(list);
       })
       .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    // Event handlers are now in useAgent.ts with session-id guards
   }, []);
 
 
@@ -72,6 +66,7 @@ export default function App() {
               workspaceId: activeWs,
               modelName: currentModel,
               userName: "",
+              firstMessage: message.slice(0, 80),
               lastMessage: message.slice(0, 80),
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -121,32 +116,48 @@ export default function App() {
         const data = await window.go?.desktop?.App?.LoadSession?.(id);
         if (!data) return;
 
-        // If another session is streaming, let it finish in background
-        // Only clear if no active streaming
-        if (!useChatStore.getState().isStreaming || useChatStore.getState().activeSessionId === id) {
+        const chatState = useChatStore.getState();
+        const switchingAwayFromStreaming = chatState.isStreaming && chatState.activeSessionId !== id;
+
+        if (switchingAwayFromStreaming) {
+          stashCurrentStreamToBackground();
+          clearMessages();
+        } else {
           clearMessages();
           resetStreamState();
         }
 
         sessStore.setCurrentSessionId(id);
 
-        // Convert loaded messages to ChatMessage format
-        for (const m of data.messages) {
-          addRestoredMessage({
+        const restoredBackground = restoreBackgroundStream(id);
+        const snapshot = getSessionSnapshot(id);
+        if (!restoredBackground && snapshot) {
+          replaceMessages(snapshot);
+        }
+        if (!restoredBackground && !snapshot) {
+          const restoredMessages: ChatMessage[] = data.messages.map((m, index) => ({
+            id: `restored-${id}-${index}`,
             role: m.role as "user" | "assistant",
             content: m.content,
-            thinking: m.thinking,
-            toolLines: m.toolLines,
-            tokens: m.tokens,
-            toolCalls: m.toolCalls,
-            durationMs: m.durationMs,
-          });
+            thinking: m.thinking || undefined,
+            toolCalls: m.toolLines?.map((line, toolIndex) => ({
+              id: `restored-${id}-${index}-${toolIndex}`,
+              name: line.split("(")[0]?.trim() || "tool",
+              args: "",
+              result: line,
+              status: "done" as const,
+            })),
+            tokens: m.tokens || undefined,
+            duration: m.durationMs || undefined,
+            timestamp: Date.now() + index,
+          }));
+          replaceMessages(restoredMessages);
         }
       } catch (e) {
         console.error("Failed to load session:", e);
       }
     },
-    [addRestoredMessage, sessStore, clearMessages, resetStreamState]
+    [addRestoredMessage, sessStore, clearMessages, resetStreamState, stashCurrentStreamToBackground, restoreBackgroundStream, getSessionSnapshot, replaceMessages]
   );
 
   const handleDeleteSession = useCallback(

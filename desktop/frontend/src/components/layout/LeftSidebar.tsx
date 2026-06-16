@@ -78,7 +78,7 @@ function truncate(str: string, max: number): string {
 }
 
 function sessionTitle(session: SessionItem): string {
-  const title = session.lastMessage?.trim();
+  const title = session.firstMessage?.trim() || session.lastMessage?.trim();
   return title ? truncate(title.replace(/\s+/g, " "), 72) : t("new_chat");
 }
 

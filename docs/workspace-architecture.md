@@ -477,13 +477,14 @@ type WorkspaceDTO struct {
 }
 
 type SessionDTO struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspaceId"`
-	ModelName   string `json:"modelName"`
-	UserName    string `json:"userName"`
-	LastMessage string `json:"lastMessage"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID           string `json:"id"`
+	WorkspaceID  string `json:"workspaceId"`
+	ModelName    string `json:"modelName"`
+	UserName     string `json:"userName"`
+	FirstMessage string `json:"firstMessage"`
+	LastMessage  string `json:"lastMessage"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
 }
 
 type SessionData struct {

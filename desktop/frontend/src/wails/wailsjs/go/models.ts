@@ -619,6 +619,7 @@ export namespace desktop {
 	    workspaceId: string;
 	    modelName: string;
 	    userName: string;
+	    firstMessage: string;
 	    lastMessage: string;
 	    createdAt: string;
 	    updatedAt: string;
@@ -633,6 +634,7 @@ export namespace desktop {
 	        this.workspaceId = source["workspaceId"];
 	        this.modelName = source["modelName"];
 	        this.userName = source["userName"];
+	        this.firstMessage = source["firstMessage"];
 	        this.lastMessage = source["lastMessage"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];

@@ -22,13 +22,14 @@ type WorkspaceDTO struct {
 }
 
 type SessionDTO struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspaceId"`
-	ModelName   string `json:"modelName"`
-	UserName    string `json:"userName"`
-	LastMessage string `json:"lastMessage"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID           string `json:"id"`
+	WorkspaceID  string `json:"workspaceId"`
+	ModelName    string `json:"modelName"`
+	UserName     string `json:"userName"`
+	FirstMessage string `json:"firstMessage"`
+	LastMessage  string `json:"lastMessage"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
 }
 
 type SessionData struct {
@@ -98,13 +99,14 @@ func (a *App) ListSessions(limit int) ([]SessionDTO, error) {
 	result := make([]SessionDTO, len(sessions))
 	for i, s := range sessions {
 		result[i] = SessionDTO{
-			ID:          s.ID,
-			WorkspaceID: s.WorkspaceID,
-			ModelName:   s.ModelName,
-			UserName:    s.UserName,
-			LastMessage: s.LastMessage,
-			CreatedAt:   s.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   s.UpdatedAt.Format(time.RFC3339),
+			ID:           s.ID,
+			WorkspaceID:  s.WorkspaceID,
+			ModelName:    s.ModelName,
+			UserName:     s.UserName,
+			FirstMessage: s.FirstMessage,
+			LastMessage:  s.LastMessage,
+			CreatedAt:    s.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
 		}
 	}
 	return result, nil

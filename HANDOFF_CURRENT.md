@@ -1,130 +1,146 @@
-﻿# MiMo Desktop - HANDOFF (2026-06-15)
+﻿# MiMo Desktop - HANDOFF (2026-06-16)
 
 > 工作区：`D:\works\study\mimo cli`
 > 分支：`master` | 远端：`origin/master`
-> 状态：工作区干净，与远端同步。
+> 状态：本文件记录截至 2026-06-16 的当前开发状态；最新提交请以 `git log --oneline -5` 为准。
 
 ---
 
 ## 1. 对话规则
 
-- 所有回复用中文，包括思考。
-- 每次回复开头称呼用户为"哥哥"。
-- 不要用 git reset --hard 、git checkout -- 等会丢改动的命令。
-- 未提交改动默认是工作成果，不回退。
+- 所有回复必须用中文。
+- 每次回复开头称呼用户为“哥哥”。
+- 不要使用 `git reset --hard`、`git checkout --` 等可能丢失改动的命令。
+- 未提交改动默认是工作成果，不要回退。
 
 ---
 
-## 2. Git 提交历史（最近 10 条）
+## 2. 最近提交基线
 
 ```text
+18294d0 docs: 更新 HANDOFF 交接文档 — 消息操作栏、流式指示器、会话切换修复
 84bf652 feat: 消息操作栏增强、侧边栏流式指示器、会话切换bug修复
-156a930 feat: actor streaming output
-3c4eefc feat: task panel event timeline on expand
-cf713b8 perf: code splitting — main bundle 1.2MB → 460KB
-3277501 feat: file preview modal, JSON tree, code block modernization
-86f2302 docs: update HANDOFF for new session
-aebc0c5 chore: regenerate wails bindings for task methods
-98de7ae feat: tree-style task IDs, rename/archive/progress
-76e0720 feat: memory config now affects runtime behavior
-e5ad79a feat: real LLM execution for sub-agents (actors)
+a99e00f fix: use smooth scroll for session load
+0e9c09e fix: reliable scroll-to-bottom on session load using containerRef + double-rAF
+c20f0c1 fix: scroll to bottom after loading session messages
 ```
 
 ---
 
-## 3. 本轮完成的功能（84bf652）
+## 3. 本轮完成内容
 
-### 3.1 消息操作栏增强
-- 右键菜单改为底部悬浮操作栏（胶囊型，hover 显示）
-- 复制按钮：点击后绿色 Check 图标 + "Copied" 文字，1.6s 自动恢复
-- 重新生成按钮：点击后旋转动画 + "Regenerating..." 提示
-- 用户消息只保留复制，助手消息保留复制 + 重新生成
-- 统一使用 CSS 变量适配亮暗主题
+### 3.1 会话切换与后台流式修复
+- 根因：前端 `chatStore` 原本只有一套全局聊天/流式状态，当前展示会话和后台仍在生成的原会话会互相污染。
+- `chatStore` 新增后台流式缓冲：`backgroundSessionId/backgroundMessages/backgroundThinking/backgroundDelta/backgroundToolCalls`。
+- `App.tsx` 切换会话时，如果当前会话仍在流式，会先把流式状态转入后台缓冲，再加载目标会话。
+- `useAgent.ts` 的 `DELTA/THINKING/TOOL_CALL/TOOL_RESULT` 会根据后台会话状态写入后台缓冲，不再写入当前前台会话。
+- `CHAT_DONE/CHAT_ERROR/CHAT_CANCELLED` 支持后台会话收尾并回写原会话，避免 A 后台结束时出现在 B 对话中。
+- 新增 `sessionSnapshots` 快照缓存，解决完成后异步保存与快速切回之间的竞态；切回时优先展示前端快照，后端保存成功后清理快照。
 
-### 3.2 侧边栏流式指示器
-- 正在生成的会话，左上角消息图标变为旋转 Loader2（主题色 `--color-accent`）
-- 对话结束后自动恢复为普通 MessageSquare 图标
-- 依赖 `sessionStore.streamingSessionId` 驱动
-- `App.tsx` 中 `handleSend` 发送时设置 `setStreamingSessionId`
-- `useAgent.ts` 中 `CHAT_DONE/ERROR/CANCELLED` 清除 `streamingSessionId`
+### 3.2 `firstMessage` 持久化
+- `internal/session/store.go` 新增 `sessions.first_message` 迁移，并回填历史会话的首条用户消息。
+- `Session` / `SessionDTO` / Wails models 同步增加 `firstMessage` 字段。
+- `SaveSession` 保存时保留首条用户消息，不被后续 `lastMessage` 覆盖。
+- `LeftSidebar` 标题优先显示 `firstMessage`，回退 `lastMessage`。
 
-### 3.3 会话标题规则
-- 标题以第一次用户提问为准，不随后续对话变化
-- `sessionStore` 新增 `firstMessage` 字段
-- 新建会话时同时写入 `firstMessage` 和 `lastMessage`
-- `setSessions` 和 `addSession` 自动补全 `firstMessage`
+### 3.3 文本选择与“添加到对话”
+- 聊天消息区允许文本选中，外层 `select-none` 不再阻止消息正文选择。
+- 选中文字后显示原生 DOM 浮层按钮 `添加到对话`，避免 React 重渲染打断原生选区。
+- 增加自绘选区高亮覆盖层，避免 WebView 在按钮出现后隐藏原生选区视觉。
+- 点击 `添加到对话` 后，将选中文本按引用块格式追加到底部输入框，并聚焦到输入框末尾。
+- `MessageBubble` 在存在有效文本选区时冻结 hover 操作栏，避免复制/重新生成按钮出现导致选区消失。
 
-### 3.4 思考中组件灵动化
-- 实时思考时：Brain → Sparkles 星光图标 + 脉冲呼吸光圈 + 自身闪烁
-- 动态省略号：`思考中...` 循环跳动（500ms 间隔）
-- 无内容时也显示"思考中..."动画
-- `ThinkingBlock` 新增 `isLive` prop
-- `MessageList` 流式区域使用 `<ThinkingBlock isLive />`
+### 3.4 会话加载滚动优化
+- 历史消息加载从逐条 `addRestoredMessage` 改为一次性 `replaceMessages`。
+- 大批量历史加载时直接跳到底部；只有直播/流式新增内容时才平滑滚动。
+- 解决进入长历史会话时从顶部慢慢滚到底部的问题。
 
-### 3.5 会话切换 Bug 修复
-- **根因**：流式回调不检查当前 UI 展示的会话，切换后继续往新会话写
-- **修复**：
-  - `chatStore` 新增 `activeSessionId`，发送消息时记录
-  - `useAgent.ts` 的 DELTA/THINKING/TOOL_CALL/TOOL_RESULT 加会话 ID 校验
-  - `CHAT_DONE` 完成时如果会话已切换，静默保存到原会话
-  - `CHAT_ERROR` / `CHAT_CANCELLED` 同理处理
-  - 删除 `App.tsx` 中重复的 `window.runtime.EventsOn` 事件监听
-  - `handleLoadSession` 切换会话时，如果另一个会话正在流式，不清空消息
-  - `resetStreamState` 同时清除 `activeSessionId`
+### 3.5 思考中 DNA 动画
+- `ThinkingBlock` 的 live 状态改为横向 DNA 双螺旋动画。
+- live 状态不再显示“思考中”文字和省略号，只展示动画。
+- DNA 动画使用青蓝/紫色渐变，并支持 `prefers-reduced-motion`。
+- 历史 thinking 内容仍保留 `Brain` 图标、预览和展开逻辑。
 
-### 3.6 ToolCallCard JSON 解析兜底
-- 加固 `parseArgs` 函数，处理空字符串、非对象 JSON、数组等情况
+### 3.6 Markdown 代码显示优化
+- 行内代码从黄色字 + 灰底改为主题适配的 `mimo-inline-code`。
+- fenced code block 增加 `CodeBlock` 包装组件，右上角 hover 显示复制图标，复制成功显示绿色 Check。
+- 代码块背景、边框、复制按钮背景新增亮/暗主题变量。
+- 使用 `customStyle` / `codeTagProps` 强制覆盖 `SyntaxHighlighter` 内部背景，修复代码块外圈黑底问题。
+
+### 3.7 清理与文档
+- 清理 `App.tsx` 中不再使用的事件 selector 和空 `useEffect`。
+- 更新 `docs/workspace-architecture.md` 中的 `SessionDTO` 字段说明。
+- 更新 Wails TypeScript model 中的 `SessionDTO.firstMessage`。
 
 ---
 
-## 4. 修改的文件清单
+## 4. 修改文件清单
 
 | 文件 | 改动说明 |
 |------|---------|
-| `desktop/frontend/src/App.tsx` | 删除重复事件监听、handleLoadSession 流式保护、setStreamingSessionId |
-| `desktop/frontend/src/components/chat/MessageBubble.tsx` | 底部操作栏、复制/重新生成反馈、用户消息只复制 |
-| `desktop/frontend/src/components/chat/MessageList.tsx` | 主题适配、去掉固定显示逻辑 |
-| `desktop/frontend/src/components/chat/ThinkingBlock.tsx` | 灵动思考动画、isLive 模式 |
-| `desktop/frontend/src/components/chat/ToolCallCard.tsx` | JSON 解析兜底 |
-| `desktop/frontend/src/components/layout/LeftSidebar.tsx` | 侧边栏流式指示器、firstMessage 标题 |
-| `desktop/frontend/src/hooks/useAgent.ts` | 会话 ID 校验、CHAT_DONE/ERROR/CANCELLED 处理 |
-| `desktop/frontend/src/stores/chatStore.ts` | activeSessionId 追踪、resetStreamState 清理 |
-| `desktop/frontend/src/stores/sessionStore.ts` | firstMessage 字段、setSessions 补全 |
+| `desktop/frontend/src/App.tsx` | 会话切换后台流式缓冲、批量恢复消息、快照优先加载、firstMessage 写入 |
+| `desktop/frontend/src/hooks/useAgent.ts` | 后台流式事件分流、后台收尾保存、会话快照保存竞态修复 |
+| `desktop/frontend/src/stores/chatStore.ts` | 后台流式缓冲、会话快照、批量替换消息 |
+| `desktop/frontend/src/stores/sessionStore.ts` | `firstMessage` 补全与更新签名 |
+| `desktop/frontend/src/components/layout/LeftSidebar.tsx` | 会话标题优先使用 `firstMessage` |
+| `desktop/frontend/src/components/chat/MessageList.tsx` | 选区浮层、自绘高亮、历史加载直接到底部 |
+| `desktop/frontend/src/components/chat/ChatInput.tsx` | 监听选区追加事件，将片段加入输入框 |
+| `desktop/frontend/src/components/chat/MessageBubble.tsx` | 选区存在时冻结 hover 操作栏 |
+| `desktop/frontend/src/components/chat/ThinkingBlock.tsx` | 横向 DNA live thinking 动画 |
+| `desktop/frontend/src/components/chat/MarkdownRenderer.tsx` | 代码块复制按钮、行内代码/代码块 class 调整 |
+| `desktop/frontend/src/styles/globals.css` | 选择区、DNA 动画、代码主题变量和代码块背景 |
+| `desktop/app_session.go` | `SessionDTO.firstMessage` 映射 |
+| `internal/session/store.go` | `first_message` 数据库迁移、查询与保存逻辑 |
+| `desktop/frontend/src/wails/wailsjs/go/models.ts` | Wails model 增加 `firstMessage` |
+| `docs/workspace-architecture.md` | 文档同步 `SessionDTO.firstMessage` |
 
 ---
 
 ## 5. 验证状态
 
-- `cd desktop/frontend; vite build` — ✓ built in ~5s，主包 468KB
-- 项目有历史 TS 类型错误（`window.go` 未声明等），不影响构建和运行
+已执行并通过：
+
+```text
+cd desktop/frontend; npm run build
+cd D:\works\study\mimo cli; go test ./desktop/... ./internal/session/... -count=1
+```
+
+已知构建输出仍有历史警告：
+- `syntax-highlighter` chunk 约 660KB，大于 Vite 默认建议值。
+- Node ESM warning 仍存在，不影响本次功能验证。
 
 ---
 
-## 6. 已知潜在问题
+## 6. 用户已手测/反馈状态
 
-1. **项目有大量历史 TS 类型错误**（`window.go` 未声明、Wails EventCallback 类型不匹配等），不是本次引入，`tsc` 检查报 120+ 错误
-2. **Vite 构建有 chunk 大小警告**（syntax-highlighter 660KB、index 468KB），建议 manualChunks 优化
-3. **`firstMessage` 只在前端 store 里**，没有持久化到后端会话数据，重启后旧会话的 firstMessage 会回退为 lastMessage
-4. **流式切换场景下原会话保存依赖 `SaveSessionFromFrontend`**，如果后端有并发问题可能丢失数据
-5. **`App.tsx` 中的 `handleDone` 仍然是死代码**（事件监听已删除），可以清理
-6. **`workspaceIdFromDir` 函数已定义但未使用**，可以清理
+- 会话后台流式不再串到当前会话。
+- 进入长历史会话已能直接到底部。
+- 代码块黑色背景问题已针对截图修复。
+- 文本选择/添加到对话已多轮修正：使用原生按钮 + 自绘高亮 + 冻结 hover 操作栏。
 
 ---
 
-## 7. 建议下一步（按优先级）
+## 7. 已知潜在问题
+
+1. **Vite chunk 大小警告**：`syntax-highlighter` 仍是最大包，建议后续动态导入或拆分。
+2. **项目历史 TS 类型问题**：全量 `tsc` 仍可能存在 `window.go` 等历史声明问题；本轮以 `vite build` 验证为准。
+3. **文本选择交互依赖 WebView selection 行为**：当前已用自绘高亮兜底，但仍建议继续手测复杂 Markdown/代码块中的选择体验。
+4. **流式后台保存依赖前端 `SaveSessionFromFrontend`**：已加前端快照兜底，但后续可考虑后端直接按 sessionID 保存，进一步降低前端职责。
+
+---
+
+## 8. 建议下一步
 
 ### 高优先级
-1. **手动测试流式切换场景**：发送消息 → 切换会话 → 确认原会话内容正确保存、新会话不受影响
-2. **清理 `App.tsx` 中的死代码**（handleDone、workspaceIdFromDir 等）
-3. **`firstMessage` 持久化到后端**，确保重启后标题不丢
-4. **Skill 系统对接**：Dream/Distill 产出应落盘为 `.mimo/skills/` 下的 skill 文件
+1. **Skill 系统对接**：Dream/Distill 产出落盘为 `.mimo/skills/` 下的 skill 文件。
+2. **输入历史记录完善**：当前 `ChatInput` 有基础上下键历史，可继续做跨会话/持久化历史。
+3. **Token 预算警告**：状态栏提示上下文接近上限。
 
 ### 中优先级
-5. **输入历史记录**：上下箭头翻阅历史消息
-6. **Token 预算警告**：状态栏变色提示上下文接近上限
-7. **MCP 工具在 actor 可用**：实际测试验证
+4. **Vite 构建优化**：`syntax-highlighter` 动态导入或 manualChunks。
+5. **MCP 工具在 actor 可用性验证**：实际跑一轮 actor 工具调用。
+6. **清理历史 TS 类型错误**：补 `window.go` / Wails runtime 类型声明。
 
 ### 低优先级
-8. **Vite 构建优化**：syntax-highlighter 动态导入、vendor 拆分
-9. **清理历史 TS 类型错误**（工作量较大）
-10. **PDF 预览**：FilePreviewModal 支持 PDF 渲染
+7. **PDF 预览**：FilePreviewModal 支持 PDF 渲染。
+8. **代码块体验增强**：显示语言标签、复制按钮常显开关、代码换行切换。

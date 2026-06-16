@@ -1,4 +1,4 @@
-﻿import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+﻿import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   ChevronDown,
   FileText,
@@ -105,6 +105,34 @@ export function ChatInput({ onSend, onCancel }: Props) {
   const inputHistory = useRef<string[]>([]);
   const historyIndex = useRef(-1);
   const savedInput = useRef("");
+
+
+  useEffect(() => {
+    const handleAddSelection = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      const selectedText = detail?.text?.trim();
+      if (!selectedText) return;
+
+      const quoted = selectedText
+        .split(/\r?\n/)
+        .map((line) => `> ${line}`)
+        .join("\n");
+
+      setText((current) => (current.trim() ? `${current}\n\n${quoted}` : quoted));
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight}px`;
+        textarea.selectionStart = textarea.value.length;
+        textarea.selectionEnd = textarea.value.length;
+      });
+    };
+
+    window.addEventListener("mimo:add-selection-to-chat", handleAddSelection);
+    return () => window.removeEventListener("mimo:add-selection-to-chat", handleAddSelection);
+  }, []);
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
@@ -342,3 +370,4 @@ export function ChatInput({ onSend, onCancel }: Props) {
     </div>
   );
 }
+
