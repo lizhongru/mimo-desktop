@@ -10,12 +10,13 @@ export function useAgent() {
   const store = useChatStore;
   const activity = useActivityStore;
 
-  const toFrontendDto = (messages: Array<{ role: string; content: string; thinking?: string; toolCalls?: Array<{ name: string; args: string }>; tokens?: number; duration?: number }>) =>
+  const toFrontendDto = (messages: Array<{ role: string; content: string; thinking?: string; toolCalls?: Array<{ name: string; args: string }>; tokens?: number; duration?: number; selectedSkills?: string[] }>) =>
     messages.map((message) => ({
       role: message.role,
       content: message.content,
       thinking: message.thinking || "",
       toolLines: (message.toolCalls || []).map((toolCall) => toolCall.name + '(' + toolCall.args + ')'),
+      selectedSkills: message.selectedSkills || [],
       tokens: message.tokens || 0,
       toolCalls: message.toolCalls?.length || 0,
       durationMs: message.duration || 0,
@@ -194,7 +195,7 @@ export function useAgent() {
         if (targetBackgroundSid && targetBackgroundSid !== currentSid) {
           const finalMsgs = store.getState().finalizeBackgroundResponse(data.response, data.duration);
           store.getState().setSessionSnapshot(targetBackgroundSid, finalMsgs);
-          const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+          const dto = toFrontendDto(finalMsgs);
           window.go?.desktop?.App?.SaveSessionFromFrontend?.(targetBackgroundSid, dto).then(() => store.getState().clearSessionSnapshot(targetBackgroundSid)).catch(console.error);
           useSessionStore.getState().setStreamingSessionId(null);
           return;
@@ -220,7 +221,7 @@ export function useAgent() {
           const backgroundSid = state.backgroundSessionId;
           const finalMsgs = state.finalizeBackgroundResponse(`${t("error_prefix")}: ${args[0]}`, 0);
           store.getState().setSessionSnapshot(backgroundSid, finalMsgs);
-          const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+          const dto = toFrontendDto(finalMsgs);
           window.go?.desktop?.App?.SaveSessionFromFrontend?.(backgroundSid, dto).then(() => store.getState().clearSessionSnapshot(backgroundSid)).catch(console.error);
           useSessionStore.getState().setStreamingSessionId(null);
           return;
@@ -248,7 +249,7 @@ export function useAgent() {
           const finalMsgs = store.getState().cancelBackgroundResponse();
           if (finalMsgs.length > 0) {
             store.getState().setSessionSnapshot(targetBackgroundSid, finalMsgs);
-            const dto = finalMsgs.map((m) => ({ role: m.role, content: m.content, thinking: m.thinking || '', toolLines: (m.toolCalls || []).map((tc) => tc.name + '(' + tc.args + ')'), tokens: m.tokens || 0, toolCalls: m.toolCalls?.length || 0, durationMs: m.duration || 0 }));
+            const dto = toFrontendDto(finalMsgs);
             window.go?.desktop?.App?.SaveSessionFromFrontend?.(targetBackgroundSid, dto).then(() => store.getState().clearSessionSnapshot(targetBackgroundSid)).catch(console.error);
           }
         }

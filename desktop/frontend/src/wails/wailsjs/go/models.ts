@@ -359,6 +359,7 @@ export namespace desktop {
 	    content: string;
 	    thinking?: string;
 	    toolLines?: string[];
+	    selectedSkills?: string[];
 	    tokens: number;
 	    toolCalls: number;
 	    durationMs: number;
@@ -373,6 +374,7 @@ export namespace desktop {
 	        this.content = source["content"];
 	        this.thinking = source["thinking"];
 	        this.toolLines = source["toolLines"];
+	        this.selectedSkills = source["selectedSkills"];
 	        this.tokens = source["tokens"];
 	        this.toolCalls = source["toolCalls"];
 	        this.durationMs = source["durationMs"];

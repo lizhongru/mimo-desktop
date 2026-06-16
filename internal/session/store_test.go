@@ -92,6 +92,30 @@ func TestLoadSessionAfterCreateThenSaveReturnsSavedMessages(t *testing.T) {
 	}
 }
 
+func TestSaveSessionPersistsSelectedSkills(t *testing.T) {
+	store := newTestStore(t)
+
+	if err := store.CreateSession("session-1", DefaultWorkspaceID, "mimo", "tester"); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	if err := store.SaveSession("session-1", DefaultWorkspaceID, "mimo", "tester", []Message{
+		{Role: "user", Content: "run checks", SelectedSkills: []string{"go-test", "frontend-build"}},
+	}); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+
+	_, messages, err := store.LoadSession("session-1")
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("message count = %d, want 1", len(messages))
+	}
+	if got := messages[0].SelectedSkills; len(got) != 2 || got[0] != "go-test" || got[1] != "frontend-build" {
+		t.Fatalf("selected skills = %#v", got)
+	}
+}
+
 func TestLoadMessagesFromOffsetUsesMessagePosition(t *testing.T) {
 	store := newTestStore(t)
 

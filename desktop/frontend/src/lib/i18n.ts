@@ -272,6 +272,10 @@ type TranslationKey =
   | "skill_candidate_explain_deploy_workflow"
   | "skill_candidate_explain_command"
   | "skill_candidate_explain_default"
+  | "message_selected_skills"
+  | "add_selection_to_chat"
+  | "copied"
+  | "regenerating"
 ;
 
 const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
@@ -823,6 +827,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     skill_candidate_explain_deploy_workflow: "Reuses a deployment workflow. When selected, the assistant prioritizes the deployment steps and commands recorded in this Skill.",
     skill_candidate_explain_command: "Reuses a command workflow that appeared repeatedly in prior conversations. When selected, the assistant references and prioritizes this command: {command}",
     skill_candidate_explain_default: "Reuses a working method distilled from prior conversations. When selected, the assistant references this Skill's description and steps.",
+    message_selected_skills: "Used this turn",
+    add_selection_to_chat: "Add to chat",
+    copied: "Copied",
+    regenerating: "Regenerating...",
 
   },
 };

@@ -120,6 +120,23 @@ export function MessageBubble({ message }: Props) {
           )}
         </div>
 
+        {isUser && message.selectedSkills && message.selectedSkills.length > 0 && (
+          <div className="mt-1 flex max-w-full flex-wrap justify-end gap-1 text-[10px] text-[var(--text-muted)]">
+            <span className="rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/80 px-2 py-0.5">
+              {t("message_selected_skills")}
+            </span>
+            {message.selectedSkills.map((skill) => (
+              <span
+                key={skill}
+                className="max-w-[160px] truncate rounded-full border border-[var(--color-accent)]/25 bg-[var(--color-accent)]/10 px-2 py-0.5 text-[var(--color-accent)]"
+                title={skill}
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div
           className={clsx(
             "pointer-events-none mt-1 flex items-center gap-1 transition-all duration-200",
@@ -130,7 +147,7 @@ export function MessageBubble({ message }: Props) {
           <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/95 px-1 py-0.5 text-[var(--text-secondary)] shadow-sm backdrop-blur">
             <button
               type="button"
-              title={copied ? "Copied" : t("copy_text")}
+              title={copied ? t("copied") : t("copy_text")}
               onClick={handleCopy}
               className={clsx(
                 "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] transition-all duration-200",
@@ -144,13 +161,13 @@ export function MessageBubble({ message }: Props) {
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              <span>{copied ? "Copied" : t("copy_text")}</span>
+              <span>{copied ? t("copied") : t("copy_text")}</span>
             </button>
 
             {!isUser && (
               <button
                 type="button"
-                title={regenerating ? "Regenerating..." : t("regenerate")}
+                title={regenerating ? t("regenerating") : t("regenerate")}
                 onClick={handleRegenerate}
                 disabled={regenerating}
                 className={clsx(
@@ -167,7 +184,7 @@ export function MessageBubble({ message }: Props) {
                   )}
                 />
                 <span>
-                  {regenerating ? "Regenerating..." : t("regenerate")}
+                  {regenerating ? t("regenerating") : t("regenerate")}
                 </span>
               </button>
             )}

@@ -6,6 +6,7 @@ export interface ChatMessage {
   toolCalls?: ToolCallEvent[];
   tokens?: number;
   duration?: number;
+  selectedSkills?: string[];
   timestamp: number;
 }
 

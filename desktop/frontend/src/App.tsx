@@ -84,7 +84,7 @@ export default function App() {
         setCompressing(false);
       }
 
-      addUserMessage(message);
+      addUserMessage(message, selectedSkills);
       useSessionStore.getState().setStreamingSessionId(useSessionStore.getState().currentSessionId);
       try {
         await window.go?.desktop?.App?.SendMessage?.(message, attachments?.length ? JSON.stringify(attachments) : "", JSON.stringify(selectedSkills || []));
@@ -150,6 +150,7 @@ export default function App() {
             })),
             tokens: m.tokens || undefined,
             duration: m.durationMs || undefined,
+            selectedSkills: m.selectedSkills && m.selectedSkills.length > 0 ? [...m.selectedSkills] : undefined,
             timestamp: Date.now() + index,
           }));
           replaceMessages(restoredMessages);
@@ -251,7 +252,7 @@ export default function App() {
       if (lastUser) {
         const lastUserIdx = msgs.lastIndexOf(lastUser);
         useChatStore.setState({ messages: msgs.slice(0, lastUserIdx) });
-        handleSend(lastUser.content);
+        handleSend(lastUser.content, undefined, lastUser.selectedSkills);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {

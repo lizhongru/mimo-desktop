@@ -40,13 +40,14 @@ type SessionData struct {
 }
 
 type ChatMessageDTO struct {
-	Role       string   `json:"role"`
-	Content    string   `json:"content"`
-	Thinking   string   `json:"thinking,omitempty"`
-	ToolLines  []string `json:"toolLines,omitempty"`
-	Tokens     int      `json:"tokens"`
-	ToolCalls  int      `json:"toolCalls"`
-	DurationMs int64    `json:"durationMs"`
+	Role           string   `json:"role"`
+	Content        string   `json:"content"`
+	Thinking       string   `json:"thinking,omitempty"`
+	ToolLines      []string `json:"toolLines,omitempty"`
+	SelectedSkills []string `json:"selectedSkills,omitempty"`
+	Tokens         int      `json:"tokens"`
+	ToolCalls      int      `json:"toolCalls"`
+	DurationMs     int64    `json:"durationMs"`
 }
 
 // ============================================================
@@ -125,7 +126,8 @@ func (a *App) LoadSession(sessionID string) (*SessionData, error) {
 	for i, m := range messages {
 		msgs[i] = ChatMessageDTO{
 			Role: m.Role, Content: m.Content, Thinking: m.Thinking,
-			ToolLines: m.ToolLines, Tokens: m.Tokens, ToolCalls: m.ToolCalls, DurationMs: m.DurationMs,
+			ToolLines: m.ToolLines, SelectedSkills: m.SelectedSkills,
+			Tokens: m.Tokens, ToolCalls: m.ToolCalls, DurationMs: m.DurationMs,
 		}
 	}
 	a.mu.Lock()
@@ -206,7 +208,7 @@ func (a *App) SaveSessionFromFrontend(sessionID string, messages []ChatMessageDT
 		msgs[i] = session.Message{
 			Role: m.Role, Content: m.Content, Tokens: m.Tokens,
 			ToolCalls: m.ToolCalls, DurationMs: m.DurationMs,
-			Thinking: m.Thinking, ToolLines: m.ToolLines, CreatedAt: time.Now(),
+			Thinking: m.Thinking, ToolLines: m.ToolLines, SelectedSkills: m.SelectedSkills, CreatedAt: time.Now(),
 		}
 	}
 	// Read workspaceID from the existing session record

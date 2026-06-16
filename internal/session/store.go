@@ -1,4 +1,4 @@
-﻿package session
+package session
 
 import (
 	"database/sql"
@@ -48,16 +48,17 @@ type Session struct {
 
 // Message represents a single message in a session
 type Message struct {
-	ID         int64
-	SessionID  string
-	Role       string
-	Content    string
-	Tokens     int
-	ToolCalls  int
-	DurationMs int64
-	Thinking   string
-	ToolLines  []string
-	CreatedAt  time.Time
+	ID             int64
+	SessionID      string
+	Role           string
+	Content        string
+	Tokens         int
+	ToolCalls      int
+	DurationMs     int64
+	Thinking       string
+	ToolLines      []string
+	SelectedSkills []string
+	CreatedAt      time.Time
 }
 
 // Open opens or creates the SQLite database
@@ -134,6 +135,7 @@ func migrate(db *sql.DB) error {
 			duration_ms INTEGER NOT NULL DEFAULT 0,
 			thinking TEXT NOT NULL DEFAULT '',
 			tool_lines TEXT NOT NULL DEFAULT '[]',
+			selected_skills TEXT NOT NULL DEFAULT '[]',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 		);
@@ -148,6 +150,7 @@ func migrate(db *sql.DB) error {
 	// --- Migration v2: thinking + tool_lines ---
 	db.Exec("ALTER TABLE messages ADD COLUMN thinking TEXT NOT NULL DEFAULT ''")
 	db.Exec("ALTER TABLE messages ADD COLUMN tool_lines TEXT NOT NULL DEFAULT '[]'")
+	db.Exec("ALTER TABLE messages ADD COLUMN selected_skills TEXT NOT NULL DEFAULT '[]'")
 
 	// --- Migration v3: workspaces + workspace_id ---
 	// Create default workspace if it doesn't exist
@@ -447,8 +450,8 @@ func (s *Store) SaveSession(id, workspaceID, modelName, userName string, message
 			return err
 		}
 		stmt, err := tx.Prepare(`
-			INSERT INTO messages (session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO messages (session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, selected_skills, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
@@ -456,7 +459,8 @@ func (s *Store) SaveSession(id, workspaceID, modelName, userName string, message
 		defer stmt.Close()
 		for _, msg := range messages {
 			toolLinesJSON, _ := json.Marshal(msg.ToolLines)
-			_, err = stmt.Exec(id, msg.Role, msg.Content, msg.Tokens, msg.ToolCalls, msg.DurationMs, msg.Thinking, string(toolLinesJSON), msg.CreatedAt)
+			selectedSkillsJSON, _ := json.Marshal(msg.SelectedSkills)
+			_, err = stmt.Exec(id, msg.Role, msg.Content, msg.Tokens, msg.ToolCalls, msg.DurationMs, msg.Thinking, string(toolLinesJSON), string(selectedSkillsJSON), msg.CreatedAt)
 			if err != nil {
 				return err
 			}
@@ -478,7 +482,7 @@ func (s *Store) LoadSession(id string) (*Session, []Message, error) {
 	}
 
 	rows, err := s.db.Query(`
-		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, created_at
+		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, selected_skills, created_at
 		FROM messages WHERE session_id = ?
 		ORDER BY id ASC
 	`, id)
@@ -491,10 +495,12 @@ func (s *Store) LoadSession(id string) (*Session, []Message, error) {
 	for rows.Next() {
 		var msg Message
 		var toolLinesJSON string
-		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.Role, &msg.Content, &msg.Tokens, &msg.ToolCalls, &msg.DurationMs, &msg.Thinking, &toolLinesJSON, &msg.CreatedAt); err != nil {
+		var selectedSkillsJSON string
+		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.Role, &msg.Content, &msg.Tokens, &msg.ToolCalls, &msg.DurationMs, &msg.Thinking, &toolLinesJSON, &selectedSkillsJSON, &msg.CreatedAt); err != nil {
 			return nil, nil, err
 		}
 		json.Unmarshal([]byte(toolLinesJSON), &msg.ToolLines)
+		json.Unmarshal([]byte(selectedSkillsJSON), &msg.SelectedSkills)
 		messages = append(messages, msg)
 	}
 	return sess, messages, nil
@@ -677,7 +683,7 @@ func (s *Store) LoadMessagesFromOffset(sessionID string, offset int) ([]Message,
 	}
 
 	rows, err := s.db.Query(`
-		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, created_at
+		SELECT id, session_id, role, content, tokens, tool_calls, duration_ms, thinking, tool_lines, selected_skills, created_at
 		FROM messages WHERE session_id = ? ORDER BY id ASC LIMIT -1 OFFSET ?
 	`, sessionID, offset)
 	if err != nil {
@@ -689,11 +695,15 @@ func (s *Store) LoadMessagesFromOffset(sessionID string, offset int) ([]Message,
 	for rows.Next() {
 		var msg Message
 		var toolLinesJSON string
-		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.Role, &msg.Content, &msg.Tokens, &msg.ToolCalls, &msg.DurationMs, &msg.Thinking, &toolLinesJSON, &msg.CreatedAt); err != nil {
+		var selectedSkillsJSON string
+		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.Role, &msg.Content, &msg.Tokens, &msg.ToolCalls, &msg.DurationMs, &msg.Thinking, &toolLinesJSON, &selectedSkillsJSON, &msg.CreatedAt); err != nil {
 			return nil, err
 		}
 		if toolLinesJSON != "" {
 			json.Unmarshal([]byte(toolLinesJSON), &msg.ToolLines)
+		}
+		if selectedSkillsJSON != "" {
+			json.Unmarshal([]byte(selectedSkillsJSON), &msg.SelectedSkills)
 		}
 		messages = append(messages, msg)
 	}

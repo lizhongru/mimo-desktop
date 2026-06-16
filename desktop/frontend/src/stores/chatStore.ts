@@ -22,7 +22,7 @@ interface ChatState {
   isCompressing: boolean;
 
   // Actions
-  addUserMessage: (content: string) => void;
+  addUserMessage: (content: string, selectedSkills?: string[]) => void;
   addRestoredMessage: (msg: {
     role: "user" | "assistant";
     content: string;
@@ -31,6 +31,7 @@ interface ChatState {
     tokens?: number;
     toolCalls?: number;
     durationMs?: number;
+    selectedSkills?: string[];
   }) => void;
   appendDelta: (delta: string) => void;
   appendThinking: (delta: string) => void;
@@ -93,11 +94,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   confirmAction: null,
   isCompressing: false,
 
-  addUserMessage: (content) => {
+  addUserMessage: (content, selectedSkills) => {
     const msg: ChatMessage = {
       id: genId(),
       role: "user",
       content,
+      selectedSkills: selectedSkills && selectedSkills.length > 0 ? [...selectedSkills] : undefined,
       timestamp: Date.now(),
     };
     set((state) => ({
@@ -126,6 +128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })),
       tokens: data.tokens || undefined,
       duration: data.durationMs || undefined,
+      selectedSkills: data.selectedSkills && data.selectedSkills.length > 0 ? [...data.selectedSkills] : undefined,
       timestamp: Date.now(),
     };
     set((state) => ({
