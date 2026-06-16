@@ -25,7 +25,10 @@ function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
 
   const statusIcon =
     entry.status === "running" ? (
-      <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+      <span className="relative flex h-4 w-4 flex-shrink-0 items-center justify-center">
+        <span className="absolute inline-flex h-4 w-4 rounded-full bg-amber-400/30 animate-ping" />
+        <Loader2 className="relative w-3.5 h-3.5 text-amber-400 animate-spin" />
+      </span>
     ) : entry.status === "done" ? (
       <CheckCircle className="w-3.5 h-3.5 text-green-500" />
     ) : (
@@ -36,7 +39,7 @@ function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
     <div className="border-b border-bdr-sub/50 last:border-0">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-elevated/30 transition-colors cursor-pointer"
+        className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-elevated/30 transition-colors cursor-pointer ${entry.status === "running" ? "bg-amber-400/5" : ""}`}
       >
         {expanded ? (
           <ChevronDown className="w-3 h-3 text-txt-g flex-shrink-0" />

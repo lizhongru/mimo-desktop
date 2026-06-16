@@ -1,12 +1,67 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { User, Bot, Copy, RefreshCw, Check } from "lucide-react";
+import { User, Bot, Copy, RefreshCw, Check, ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import clsx from "clsx";
-import type { ChatMessage } from "../../lib/types";
+import type { ChatMessage, ToolCallEvent } from "../../lib/types";
 import { useChatStore } from "../../stores/chatStore";
 import { t } from "../../lib/i18n";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallCard } from "./ToolCallCard";
+
+
+function ToolCallsBlock({ toolCalls }: { toolCalls?: ToolCallEvent[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!toolCalls || toolCalls.length === 0) return null;
+  if (toolCalls.length === 1) return <ToolCallCard toolCall={toolCalls[0]} />;
+
+  const runningCount = toolCalls.filter((toolCall) => toolCall.status === "running").length;
+  const counts = toolCalls.reduce<Record<string, number>>((acc, toolCall) => {
+    acc[toolCall.name] = (acc[toolCall.name] || 0) + 1;
+    return acc;
+  }, {});
+  const summary = Object.entries(counts)
+    .slice(0, 4)
+    .map(([name, count]) => `${name} x${count}`)
+    .join(" / ");
+  const hiddenKinds = Math.max(0, Object.keys(counts).length - 4);
+
+  return (
+    <div className="my-1.5 overflow-hidden rounded-lg border border-bdr bg-surface/40">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-elevated/50"
+        title={expanded ? t("tool_calls_collapse") : t("tool_calls_expand")}
+      >
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-txt-g" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-txt-g" />
+        )}
+        <span className="relative flex h-4 w-4 flex-shrink-0 items-center justify-center">
+          {runningCount > 0 && <span className="absolute inline-flex h-4 w-4 rounded-full bg-amber-400/30 animate-ping" />}
+          <Wrench className="relative h-3.5 w-3.5 text-amber-500" />
+        </span>
+        <span className="font-medium text-txt-2">{t("tool_calls_summary")}</span>
+        <span className="rounded-full bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-txt-m">{toolCalls.length}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-txt-g">
+          {summary}{hiddenKinds > 0 ? ` / +${hiddenKinds}` : ""}
+        </span>
+        <span className={runningCount > 0 ? "flex-shrink-0 text-amber-500" : "flex-shrink-0 text-txt-m"}>
+          {runningCount > 0 ? `${runningCount} ${t("running")}` : t("done")}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-bdr-sub px-2 py-1.5">
+          {toolCalls.map((toolCall) => (
+            <ToolCallCard key={toolCall.id} toolCall={toolCall} compact />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   message: ChatMessage;
@@ -105,9 +160,7 @@ export function MessageBubble({ message }: Props) {
                 <ThinkingBlock content={message.thinking} />
               )}
 
-              {message.toolCalls?.map((tc) => (
-                <ToolCallCard key={tc.id} toolCall={tc} />
-              ))}
+              <ToolCallsBlock toolCalls={message.toolCalls} />
 
               <MarkdownRenderer content={message.content} />
             </div>

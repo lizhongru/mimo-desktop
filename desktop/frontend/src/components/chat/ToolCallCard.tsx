@@ -6,6 +6,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 
 interface Props {
   toolCall: ToolCallEvent;
+  compact?: boolean;
 }
 
 function parseArgs(argsStr: string): Record<string, string> {
@@ -40,7 +41,7 @@ function truncateResult(result: string, maxLines = 3, maxChars = 200): string {
   return result;
 }
 
-export function ToolCallCard({ toolCall }: Props) {
+export function ToolCallCard({ toolCall, compact = false }: Props) {
   useSettingsStore((s) => s.language);
   const [expanded, setExpanded] = useState(false);
   const args = parseArgs(toolCall.args);
@@ -48,18 +49,21 @@ export function ToolCallCard({ toolCall }: Props) {
   const isMcp = toolCall.name.includes("__");
 
   return (
-    <div className="border border-bdr rounded-md my-1.5 overflow-hidden">
+    <div className={`border border-bdr rounded-md overflow-hidden ${compact ? "my-1" : "my-1.5"}`}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-elevated/50 transition-colors"
+        className={`flex items-center gap-2 w-full hover:bg-elevated/50 transition-colors cursor-pointer ${compact ? "px-2 py-1.5 text-xs" : "px-3 py-2 text-sm"}`}
       >
         {expanded ? (
           <ChevronDown className="w-3.5 h-3.5 text-txt-g flex-shrink-0" />
         ) : (
           <ChevronRight className="w-3.5 h-3.5 text-txt-g flex-shrink-0" />
         )}
-        <Wrench className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-        <span className="font-mono text-amber-400">{toolCall.name}</span>
+        <span className="relative flex h-4 w-4 flex-shrink-0 items-center justify-center">
+          {isRunning && <span className="absolute inline-flex h-4 w-4 rounded-full bg-amber-400/30 animate-ping" />}
+          <Wrench className="relative w-3.5 h-3.5 text-amber-500" />
+        </span>
+        <span className="font-mono text-amber-400 truncate">{toolCall.name}</span>
         {isMcp && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
             {t("mcp_badge")}

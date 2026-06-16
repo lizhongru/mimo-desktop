@@ -276,6 +276,9 @@ type TranslationKey =
   | "add_selection_to_chat"
   | "copied"
   | "regenerating"
+  | "tool_calls_summary"
+  | "tool_calls_expand"
+  | "tool_calls_collapse"
 ;
 
 const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
@@ -831,6 +834,9 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     add_selection_to_chat: "Add to chat",
     copied: "Copied",
     regenerating: "Regenerating...",
+    tool_calls_summary: "Tool calls",
+    tool_calls_expand: "Expand tool calls",
+    tool_calls_collapse: "Collapse tool calls",
 
   },
 };
