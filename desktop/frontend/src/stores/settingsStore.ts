@@ -1,8 +1,29 @@
 import { animateThemeSwitch } from "../lib/theme-transition";
 import { create } from "zustand";
 
+type Theme = "dark" | "light";
+
+function getInitialTheme(): Theme {
+  if (typeof document !== "undefined") {
+    if (document.documentElement.classList.contains("dark")) return "dark";
+    if (document.documentElement.classList.contains("light")) return "light";
+  }
+  try {
+    return localStorage.getItem("mimo-theme") === "light" ? "light" : "dark";
+  } catch (_) {
+    return "dark";
+  }
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("light", theme === "light");
+  document.documentElement.style.colorScheme = theme;
+  try { localStorage.setItem("mimo-theme", theme); } catch (_) {}
+}
+
 interface SettingsState {
-  theme: "dark" | "light";
+  theme: Theme;
   language: "zh" | "en";
   fontSize: number;
   currentModel: string;
@@ -13,7 +34,7 @@ interface SettingsState {
   permission: string;
   reasoningLevel: string;
 
-  setTheme: (theme: "dark" | "light", originX?: number, originY?: number) => void;
+  setTheme: (theme: Theme, originX?: number, originY?: number) => void;
   setLanguage: (lang: "zh" | "en") => void;
   setFontSize: (size: number) => void;
   setCurrentModel: (key: string) => void;
@@ -35,7 +56,7 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  theme: "dark",
+  theme: getInitialTheme(),
   language: "zh",
   fontSize: 14,
   currentModel: "mimo",
@@ -124,8 +145,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       permission: cfg.permission || "exec",
       reasoningLevel: cfg.reasoningLevel || "medium",
     } as any);
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.style.colorScheme = theme;
-    try { localStorage.setItem("mimo-theme", theme); } catch(e) {}
+    applyTheme(theme);
   },
 }));

@@ -18,9 +18,10 @@ import { t } from "../../lib/i18n";
 import { useAnimatedOpen } from "../../lib/useAnimatedOpen";
 import { type ChatAttachment, readFilesAsAttachments } from "../../lib/attachments";
 import { ModelReasoningPicker } from "../chat/ModelReasoningPicker";
+import { SkillSelector } from "../chat/SkillSelector";
 
 interface Props {
-  onSend: (message: string, attachments?: ChatAttachment[]) => void;
+  onSend: (message: string, attachments?: ChatAttachment[], selectedSkills?: string[]) => void;
   onSelectWorkspace: (dir: string) => Promise<void>;
 }
 
@@ -215,6 +216,7 @@ function AttachmentIcon({ attachment }: { attachment: ChatAttachment }) {
 export function WelcomeView({ onSend, onSelectWorkspace }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [workspace, setWorkspace] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -235,11 +237,11 @@ export function WelcomeView({ onSend, onSelectWorkspace }: Props) {
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
-    onSend(trimmed, attachments.length > 0 ? attachments : undefined);
+    onSend(trimmed, attachments.length > 0 ? attachments : undefined, selectedSkills);
     setText("");
     setAttachments([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [text, isStreaming, onSend, attachments]);
+  }, [text, isStreaming, onSend, attachments, selectedSkills]);
 
   const handleFiles = useCallback((files: FileList) => {
     void readFilesAsAttachments(files)
@@ -362,6 +364,8 @@ export function WelcomeView({ onSend, onSelectWorkspace }: Props) {
               >
                 <FolderOpen className="w-3 h-3" />
               </button>
+              <div className="w-px h-3 bg-txt-2/30 mx-0.5" />
+              <SkillSelector selected={selectedSkills} onChange={setSelectedSkills} />
               <div className="w-px h-3 bg-txt-2/30 mx-0.5" />
               <MiniDropdown
                 icon={Route}

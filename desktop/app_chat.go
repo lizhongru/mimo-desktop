@@ -26,7 +26,7 @@ var (
 
 // SendMessage sends a user message and starts streaming the agent response.
 // attachmentsJSON is an optional JSON array of {name, type, dataUrl} objects.
-func (a *App) SendMessage(message string, attachmentsJSON string) error {
+func (a *App) SendMessage(message string, attachmentsJSON string, selectedSkillsJSON string) error {
 	a.mu.Lock()
 	if a.isBusy {
 		a.mu.Unlock()
@@ -47,7 +47,11 @@ func (a *App) SendMessage(message string, attachmentsJSON string) error {
 	if workingDir != "" && a.guardrail != nil {
 		a.guardrail.SetWorkspaceRoot(workingDir)
 	}
-	a.agent.SystemPrompt(a.buildSystemPrompt(workingDir))
+	var selectedSkills []string
+	if selectedSkillsJSON != "" {
+		_ = json.Unmarshal([]byte(selectedSkillsJSON), &selectedSkills)
+	}
+	a.agent.SystemPrompt(a.buildSystemPrompt(workingDir, selectedSkills...))
 	if workingDir != "" {
 		ctx = tools.WithWorkingDir(ctx, workingDir)
 	}

@@ -2,11 +2,13 @@ package desktop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/mimo-cli/mimo-cli/internal/memory"
 	"github.com/mimo-cli/mimo-cli/internal/safety"
 	"github.com/mimo-cli/mimo-cli/internal/session"
+	"github.com/mimo-cli/mimo-cli/internal/skill"
 	"github.com/mimo-cli/mimo-cli/internal/task"
 	"github.com/mimo-cli/mimo-cli/internal/tools"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -182,12 +185,72 @@ func NewApp() (*App, error) {
 	return a, nil
 }
 
-func (a *App) buildSystemPrompt(projectDir string) string {
+type enabledProjectSkillsFile struct {
+	Skills []string `json:"skills"`
+}
+
+func buildEnabledProjectSkillsContext(projectDir string, selectedSkills []string) string {
+	data, err := os.ReadFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"))
+	if err != nil {
+		return ""
+	}
+
+	var enabled enabledProjectSkillsFile
+	if err := json.Unmarshal(data, &enabled); err != nil || len(enabled.Skills) == 0 {
+		return ""
+	}
+
+	allowed := make(map[string]bool, len(enabled.Skills))
+	for _, name := range enabled.Skills {
+		normalized, err := skill.SafeCandidateName(name)
+		if err == nil {
+			allowed[normalized] = true
+		}
+	}
+
+	var names []string
+	for _, name := range selectedSkills {
+		normalized, err := skill.SafeCandidateName(name)
+		if err == nil && allowed[normalized] {
+			names = append(names, normalized)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+
+	var content strings.Builder
+	for _, name := range names {
+		normalized, err := skill.SafeCandidateName(name)
+		if err != nil {
+			continue
+		}
+		skillData, err := os.ReadFile(filepath.Join(projectDir, ".mimo", "skills", normalized, "SKILL.md"))
+		if err != nil {
+			continue
+		}
+		if content.Len() == 0 {
+			content.WriteString("## Enabled Project Skills\n\n")
+			content.WriteString("The following project skills are enabled. Follow them when relevant to the user's request.\n")
+		}
+		content.WriteString("\n### ")
+		content.WriteString(normalized)
+		content.WriteString("\n\n")
+		content.Write(skillData)
+		content.WriteString("\n")
+	}
+	return strings.TrimSpace(content.String())
+}
+
+func (a *App) buildSystemPrompt(projectDir string, selectedSkills ...string) string {
 	if projectDir == "" {
 		projectDir, _ = os.Getwd()
 	}
 	ctxManager := mctx.NewManager(projectDir, a.cfg.Context.MaxTokens, a.ignoreMatcher)
 	systemPrompt := ctxManager.BuildSystemPrompt()
+	if skillContext := buildEnabledProjectSkillsContext(projectDir, selectedSkills); skillContext != "" {
+		systemPrompt += "\n\n" + skillContext
+	}
 	if config := getMultiAgentManager().GetCurrent(); config != nil {
 		systemPrompt += "\n\n## Current Agent Mode\n\n"
 		systemPrompt += fmt.Sprintf("Active agent: %s (%s)\n", config.Name, config.Mode)

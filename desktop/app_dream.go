@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mimo-cli/mimo-cli/internal/memory"
+	"github.com/mimo-cli/mimo-cli/internal/session"
 	"github.com/mimo-cli/mimo-cli/internal/skill"
 )
 
@@ -20,9 +22,11 @@ type DreamResult struct {
 type SkillCandidateInfo struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
+	Explanation string   `json:"explanation"`
 	Confidence  float64  `json:"confidence"`
 	Pattern     string   `json:"pattern,omitempty"`
 	Commands    []string `json:"commands,omitempty"`
+	Enabled     bool     `json:"enabled"`
 }
 
 // DreamRun runs the dream process on the current session
@@ -31,7 +35,7 @@ func (a *App) DreamRun() DreamResult {
 	defer a.mu.Unlock()
 
 	if a.currentSessionID == "" {
-		return DreamResult{Success: false, Message: "No active session"}
+		return DreamResult{Success: false, Message: ""}
 	}
 
 	wd, _ := os.Getwd()
@@ -53,26 +57,61 @@ func (a *App) DreamRun() DreamResult {
 // DistillRun runs the distill process on the current session
 func (a *App) DistillRun() DreamResult {
 	a.mu.Lock()
-	defer a.mu.Unlock()
+	sessionID := a.currentSessionID
+	a.mu.Unlock()
 
-	if a.currentSessionID == "" {
-		return DreamResult{Success: false, Message: "No active session"}
+	if sessionID == "" {
+		return DreamResult{Success: false, Message: ""}
 	}
 
 	wd, _ := os.Getwd()
 	distill := skill.NewDistill(skill.DefaultDistillConfig(), wd)
+	if a.sessionStore != nil {
+		_, messages, err := a.sessionStore.LoadSession(sessionID)
+		if err == nil && len(messages) > 0 {
+			count, err := distill.RunText(renderSessionMessagesForDistill(messages))
+			if err != nil {
+				return DreamResult{Success: false, Message: err.Error()}
+			}
+			return DreamResult{
+				Success: true,
+				Message: "",
+				Count:   count,
+			}
+		}
+	}
 
-	sessionDir := filepath.Join(wd, ".mimo", "memory", "sessions", a.currentSessionID)
+	sessionDir := filepath.Join(wd, ".mimo", "memory", "sessions", sessionID)
 	count, err := distill.Run(sessionDir)
 	if err != nil {
-		return DreamResult{Success: false, Message: fmt.Sprintf("Distill failed: %v", err)}
+		return DreamResult{Success: false, Message: err.Error()}
 	}
 
 	return DreamResult{
 		Success: true,
-		Message: fmt.Sprintf("Found %d skill candidates", count),
+		Message: "",
 		Count:   count,
 	}
+}
+
+func renderSessionMessagesForDistill(messages []session.Message) string {
+	var content strings.Builder
+	for _, message := range messages {
+		content.WriteString(message.Role)
+		content.WriteString(":\n")
+		content.WriteString(message.Content)
+		content.WriteString("\n\n")
+		if message.Thinking != "" {
+			content.WriteString("thinking:\n")
+			content.WriteString(message.Thinking)
+			content.WriteString("\n\n")
+		}
+		for _, line := range message.ToolLines {
+			content.WriteString(line)
+			content.WriteByte('\n')
+		}
+	}
+	return content.String()
 }
 
 // DistillListCandidates returns skill candidates
@@ -85,6 +124,15 @@ func (a *App) DistillListCandidates() []SkillCandidateInfo {
 		return []SkillCandidateInfo{}
 	}
 
+	distill := skill.NewDistill(skill.DefaultDistillConfig(), wd)
+	enabledNames, err := distill.ListEnabledCandidates()
+	enabled := make(map[string]bool, len(enabledNames))
+	if err == nil {
+		for _, name := range enabledNames {
+			enabled[name] = true
+		}
+	}
+
 	parsed := skill.ParseCandidatesMarkdown(data)
 	candidates := make([]SkillCandidateInfo, 0, len(parsed))
 	for _, candidate := range parsed {
@@ -94,8 +142,29 @@ func (a *App) DistillListCandidates() []SkillCandidateInfo {
 			Confidence:  candidate.Confidence,
 			Pattern:     candidate.Pattern,
 			Commands:    candidate.Commands,
+			Enabled:     enabled[candidate.Name],
 		})
 	}
 
 	return candidates
+}
+
+// DistillEnableCandidate enables a generated skill candidate
+func (a *App) DistillEnableCandidate(name string) DreamResult {
+	wd, _ := os.Getwd()
+	distill := skill.NewDistill(skill.DefaultDistillConfig(), wd)
+	if err := distill.EnableCandidate(name); err != nil {
+		return DreamResult{Success: false, Message: err.Error()}
+	}
+	return DreamResult{Success: true, Message: "", Count: 1}
+}
+
+// DistillDeleteCandidate deletes a generated skill candidate
+func (a *App) DistillDeleteCandidate(name string) DreamResult {
+	wd, _ := os.Getwd()
+	distill := skill.NewDistill(skill.DefaultDistillConfig(), wd)
+	if err := distill.DeleteCandidate(name); err != nil {
+		return DreamResult{Success: false, Message: err.Error()}
+	}
+	return DreamResult{Success: true, Message: "", Count: 1}
 }

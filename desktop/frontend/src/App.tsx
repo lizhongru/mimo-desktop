@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { useAgent } from "./hooks/useAgent";
 import { useChatStore } from "./stores/chatStore";
@@ -7,6 +7,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { useActivityStore } from "./stores/activityStore";
 import { t } from "./lib/i18n";
 import type { ChatMessage } from "./lib/types";
+import type { ChatAttachment } from "./lib/attachments";
 
 const DEFAULT_WS = "default";
 
@@ -50,8 +51,8 @@ export default function App() {
 
 
   const handleSend = useCallback(
-    async (message: string, attachments?: string) => {
-      if (!message.trim() && !attachments) return;
+    async (message: string, attachments?: ChatAttachment[], selectedSkills?: string[]) => {
+      if (!message.trim() && !attachments?.length) return;
 
       // If no session exists yet, create one lazily
       let sessionId = useSessionStore.getState().currentSessionId;
@@ -86,7 +87,7 @@ export default function App() {
       addUserMessage(message);
       useSessionStore.getState().setStreamingSessionId(useSessionStore.getState().currentSessionId);
       try {
-        await window.go?.desktop?.App?.SendMessage?.(message, attachments || "");
+        await window.go?.desktop?.App?.SendMessage?.(message, attachments?.length ? JSON.stringify(attachments) : "", JSON.stringify(selectedSkills || []));
       } catch (e) {
         const err = e instanceof Error ? e.message : String(e);
         if (!err.includes("cancelled")) {

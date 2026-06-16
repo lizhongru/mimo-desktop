@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useActivityStore } from "../../stores/activityStore";
@@ -15,6 +15,7 @@ const MemoryPanelModal = lazy(() => import("../common/MemoryPanelModal").then(m 
 const CheckpointPanelModal = lazy(() => import("../common/CheckpointPanelModal").then(m => ({ default: m.CheckpointPanelModal })));
 const TaskPanelModal = lazy(() => import("../common/TaskPanelModal").then(m => ({ default: m.TaskPanelModal })));
 const ActorPanelModal = lazy(() => import("../common/ActorPanelModal").then(m => ({ default: m.ActorPanelModal })));
+const SkillCandidateModal = lazy(() => import("../common/SkillCandidateModal").then(m => ({ default: m.SkillCandidateModal })));
 import { WelcomeView } from "../welcome/WelcomeView";
 import { useChatStore } from "../../stores/chatStore";
 import {
@@ -30,7 +31,7 @@ import { t } from "../../lib/i18n";
 
 interface Props {
   modelName: string;
-  onSend: (message: string, attachments?: { name: string; type: string; dataUrl: string }[]) => void;
+  onSend: (message: string, attachments?: { name: string; type: string; dataUrl: string }[], selectedSkills?: string[]) => void;
   onCancel: () => void;
   onNewChat: () => void;
   onLoadSession: (id: string) => void;
@@ -66,6 +67,7 @@ export function AppLayout({
   const [checkpointOpen, setCheckpointOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [actorOpen, setActorOpen] = useState(false);
+  const [skillOpen, setSkillOpen] = useState(false);
   const [rightWidth, setRightWidth] = useState(320);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -187,6 +189,7 @@ export function AppLayout({
               onOpenCheckpoint={() => setCheckpointOpen(true)}
               onOpenTask={() => setTaskOpen(true)}
               onOpenActor={() => setActorOpen(true)}
+              onOpenSkill={() => setSkillOpen(true)}
             />
           )}
         </div>
@@ -235,6 +238,7 @@ export function AppLayout({
       <CheckpointPanelModal open={checkpointOpen} onClose={() => setCheckpointOpen(false)} />
       <TaskPanelModal open={taskOpen} onClose={() => setTaskOpen(false)} />
       <ActorPanelModal open={actorOpen} onClose={() => setActorOpen(false)} />
+      <SkillCandidateModal open={skillOpen} onClose={() => setSkillOpen(false)} />
 
       <ConfirmDialog
         action={confirmAction}

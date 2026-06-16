@@ -24,6 +24,19 @@ func TestDistillAnalyze(t *testing.T) {
 	}
 }
 
+func TestDistillAnalyzeKeepsRepeatedCommandsWithDefaultConfig(t *testing.T) {
+	distill := NewDistill(DefaultDistillConfig(), t.TempDir())
+
+	candidates, err := distill.Analyze("$ npm run build\n$ npm run build\n")
+	if err != nil {
+		t.Fatalf("failed to analyze: %v", err)
+	}
+
+	if len(candidates) == 0 {
+		t.Fatal("expected repeated command to produce a candidate with default config")
+	}
+}
+
 func TestDistillSaveCandidates(t *testing.T) {
 	tmpDir := t.TempDir()
 	distill := NewDistill(DefaultDistillConfig(), tmpDir)
@@ -77,6 +90,84 @@ func TestDistillSaveCandidatesWritesSkillFiles(t *testing.T) {
 		if !strings.Contains(content, expected) {
 			t.Fatalf("expected SKILL.md to contain %q, got:\n%s", expected, content)
 		}
+	}
+}
+
+func TestDistillEnableCandidate(t *testing.T) {
+	tmpDir := t.TempDir()
+	distill := NewDistill(DefaultDistillConfig(), tmpDir)
+
+	candidates := []SkillCandidate{
+		{Name: "test skill", Description: "Test skill", Confidence: 0.8},
+	}
+	if err := distill.SaveCandidates(candidates); err != nil {
+		t.Fatalf("failed to save candidates: %v", err)
+	}
+
+	if err := distill.EnableCandidate("test skill"); err != nil {
+		t.Fatalf("failed to enable candidate: %v", err)
+	}
+
+	enabled, err := distill.ListEnabledCandidates()
+	if err != nil {
+		t.Fatalf("failed to list enabled candidates: %v", err)
+	}
+	if len(enabled) != 1 || enabled[0] != "test_skill" {
+		t.Fatalf("unexpected enabled candidates: %#v", enabled)
+	}
+
+	if err := distill.EnableCandidate("test_skill"); err != nil {
+		t.Fatalf("enabling an already enabled candidate should be idempotent: %v", err)
+	}
+	enabled, err = distill.ListEnabledCandidates()
+	if err != nil {
+		t.Fatalf("failed to list enabled candidates: %v", err)
+	}
+	if len(enabled) != 1 || enabled[0] != "test_skill" {
+		t.Fatalf("expected idempotent enable, got %#v", enabled)
+	}
+}
+
+func TestDistillDeleteCandidate(t *testing.T) {
+	tmpDir := t.TempDir()
+	distill := NewDistill(DefaultDistillConfig(), tmpDir)
+
+	candidates := []SkillCandidate{
+		{Name: "test skill", Description: "Test skill", Confidence: 0.8},
+	}
+	if err := distill.SaveCandidates(candidates); err != nil {
+		t.Fatalf("failed to save candidates: %v", err)
+	}
+	if err := distill.EnableCandidate("test skill"); err != nil {
+		t.Fatalf("failed to enable candidate: %v", err)
+	}
+
+	if err := distill.DeleteCandidate("test skill"); err != nil {
+		t.Fatalf("failed to delete candidate: %v", err)
+	}
+
+	skillDir := filepath.Join(tmpDir, ".mimo", "skills", "test_skill")
+	if _, err := os.Stat(skillDir); !os.IsNotExist(err) {
+		t.Fatalf("expected candidate dir to be removed, stat err: %v", err)
+	}
+
+	enabled, err := distill.ListEnabledCandidates()
+	if err != nil {
+		t.Fatalf("failed to list enabled candidates: %v", err)
+	}
+	if len(enabled) != 0 {
+		t.Fatalf("expected deleted candidate to be disabled, got %#v", enabled)
+	}
+}
+
+func TestDistillRejectsUnsafeCandidateName(t *testing.T) {
+	distill := NewDistill(DefaultDistillConfig(), t.TempDir())
+
+	if err := distill.EnableCandidate("../unsafe"); err == nil {
+		t.Fatal("expected unsafe enable candidate name to fail")
+	}
+	if err := distill.DeleteCandidate("../unsafe"); err == nil {
+		t.Fatal("expected unsafe delete candidate name to fail")
 	}
 }
 

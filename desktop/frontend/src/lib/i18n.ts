@@ -1,4 +1,4 @@
-﻿import { useSettingsStore } from "../stores/settingsStore";
+import { useSettingsStore } from "../stores/settingsStore";
 
 type TranslationKey =
   | "settings"
@@ -232,7 +232,47 @@ type TranslationKey =
   | "task_progress"
   | "task_progress_placeholder"
   | "task_rename_placeholder"
-  | "task_unblock";
+  | "task_unblock"
+  | "skill_candidates"
+  | "skill_candidate_load_failed"
+  | "skill_candidate_generated"
+  | "skill_candidate_generate_failed"
+  | "skill_candidate_add_failed"
+  | "skill_candidate_delete_failed"
+  | "skill_candidate_added_prefix"
+  | "skill_candidate_added_suffix"
+  | "skill_candidate_deleted_prefix"
+  | "skill_candidate_deleted_suffix"
+  | "skill_candidate_description"
+  | "skill_candidate_redistill"
+  | "skill_candidate_loading"
+  | "skill_candidate_empty_title"
+  | "skill_candidate_empty_desc"
+  | "skill_candidate_added_badge"
+  | "skill_candidate_no_description"
+  | "skill_candidate_enabled_list"
+  | "skill_candidate_confidence"
+  | "skill_candidate_status_added"
+  | "skill_candidate_status_pending"
+  | "skill_candidate_delete_action"
+  | "skill_candidate_add_action"
+  | "skill_candidate_confirm_delete_title"
+  | "skill_candidate_confirm_delete_prefix"
+  | "skill_candidate_confirm_delete_suffix"
+  | "skill_candidate_confirm_delete_action"
+  | "skill_selector_label"
+  | "skill_selector_none"
+  | "skill_selector_empty"
+  | "skill_selector_selected_suffix"
+  | "skill_candidate_explain_go_test"
+  | "skill_candidate_explain_frontend_build"
+  | "skill_candidate_explain_go_build"
+  | "skill_candidate_explain_test_workflow"
+  | "skill_candidate_explain_build_workflow"
+  | "skill_candidate_explain_deploy_workflow"
+  | "skill_candidate_explain_command"
+  | "skill_candidate_explain_default"
+;
 
 const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
   zh: {
@@ -358,7 +398,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     perm_readonly: "只读",
     perm_write: "读写",
     perm_exec: "完全访问",
-    permission_label: "MiMo ????",
+    permission_label: "MiMo ??",
     attach_file: "添加文件",
     attach_folder: "添加文件夹",
     drop_to_add: "松手即可添加",
@@ -468,6 +508,47 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     task_progress_placeholder: "输入进度说明...",
     task_rename_placeholder: "输入新名称...",
     task_unblock: "解除阻塞",
+
+    skill_candidates: "Skill 候选",
+    skill_candidate_load_failed: "加载 Skill 候选失败",
+    skill_candidate_generated: "已生成候选",
+    skill_candidate_generate_failed: "生成候选失败",
+    skill_candidate_add_failed: "添加候选失败",
+    skill_candidate_delete_failed: "删除候选失败",
+    skill_candidate_added_prefix: "已添加 ",
+    skill_candidate_added_suffix: " 到启用列表，后续会从 .mimo/skills/enabled.json 读取。",
+    skill_candidate_deleted_prefix: "已删除 ",
+    skill_candidate_deleted_suffix: "，候选目录和启用记录已清理。",
+    skill_candidate_description: "从当前会话蒸馏可复用 Skill。点击“添加到启用”后会写入 .mimo/skills/enabled.json，卡片会变成绿色“已添加”状态。",
+    skill_candidate_redistill: "重新蒸馏",
+    skill_candidate_loading: "正在加载候选...",
+    skill_candidate_empty_title: "暂无 Skill 候选",
+    skill_candidate_empty_desc: "点击“重新蒸馏”从当前会话生成候选。",
+    skill_candidate_added_badge: "已添加",
+    skill_candidate_no_description: "无描述",
+    skill_candidate_enabled_list: "已加入启用列表：.mimo/skills/enabled.json",
+    skill_candidate_confidence: "置信度",
+    skill_candidate_status_added: "当前状态：已添加到启用列表",
+    skill_candidate_status_pending: "当前状态：尚未添加",
+    skill_candidate_delete_action: "删除候选",
+    skill_candidate_add_action: "添加到启用",
+    skill_candidate_confirm_delete_title: "确认删除这个 Skill 候选？",
+    skill_candidate_confirm_delete_prefix: "将删除 ",
+    skill_candidate_confirm_delete_suffix: " 的候选目录，并从启用列表中移除。",
+    skill_candidate_confirm_delete_action: "确认删除",
+    skill_selector_label: "选择 Skill",
+    skill_selector_none: "未选 Skill",
+    skill_selector_empty: "暂无已添加的 Skill",
+    skill_selector_selected_suffix: " 个 Skill",
+    skill_candidate_explain_go_test: "用于复用 Go 测试验证流程。选择后，助手会优先按照这个 Skill 中记录的测试命令执行和总结，例如：{command}",
+    skill_candidate_explain_frontend_build: "用于复用前端构建验证流程。选择后，助手会优先按照这个 Skill 中记录的构建命令检查项目，例如：{command}",
+    skill_candidate_explain_go_build: "用于复用 Go 构建验证流程。选择后，助手会优先按照这个 Skill 中记录的构建命令确认项目可编译，例如：{command}",
+    skill_candidate_explain_test_workflow: "用于复用测试执行工作流。选择后，助手会优先规划并运行相关测试，再根据结果继续处理。",
+    skill_candidate_explain_build_workflow: "用于复用构建验证工作流。选择后，助手会优先执行项目构建，并把构建结果作为完成依据。",
+    skill_candidate_explain_deploy_workflow: "用于复用部署相关工作流。选择后，助手会优先参考该 Skill 中的部署步骤和命令。",
+    skill_candidate_explain_command: "用于复用历史会话中反复出现的命令流程。选择后，助手会参考并优先使用命令：{command}",
+    skill_candidate_explain_default: "用于复用历史会话中提炼出的工作方法。选择后，助手会参考该 Skill 的说明和步骤。",
+
   },
   en: {
     settings: "Settings",
@@ -702,12 +783,74 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     task_progress_placeholder: "Enter progress note...",
     task_rename_placeholder: "Enter new name...",
     task_unblock: "Unblock",
+
+    skill_candidates: "Skill Candidates",
+    skill_candidate_load_failed: "Failed to load skill candidates",
+    skill_candidate_generated: "Skill candidates generated",
+    skill_candidate_generate_failed: "Failed to generate candidates",
+    skill_candidate_add_failed: "Failed to add candidate",
+    skill_candidate_delete_failed: "Failed to delete candidate",
+    skill_candidate_added_prefix: "Added ",
+    skill_candidate_added_suffix: " to the enabled list. It will be read from .mimo/skills/enabled.json.",
+    skill_candidate_deleted_prefix: "Deleted ",
+    skill_candidate_deleted_suffix: ", and cleaned up its candidate directory and enabled record.",
+    skill_candidate_description: "Distill reusable Skills from the current session. After clicking Add to Enabled, it writes to .mimo/skills/enabled.json and the card turns green with an Added state.",
+    skill_candidate_redistill: "Distill Again",
+    skill_candidate_loading: "Loading candidates...",
+    skill_candidate_empty_title: "No Skill candidates",
+    skill_candidate_empty_desc: "Click Distill Again to generate candidates from the current session.",
+    skill_candidate_added_badge: "Added",
+    skill_candidate_no_description: "No description",
+    skill_candidate_enabled_list: "Added to enabled list: .mimo/skills/enabled.json",
+    skill_candidate_confidence: "Confidence",
+    skill_candidate_status_added: "Status: added to enabled list",
+    skill_candidate_status_pending: "Status: not added yet",
+    skill_candidate_delete_action: "Delete Candidate",
+    skill_candidate_add_action: "Add to Enabled",
+    skill_candidate_confirm_delete_title: "Delete this Skill candidate?",
+    skill_candidate_confirm_delete_prefix: "This will delete ",
+    skill_candidate_confirm_delete_suffix: " and remove it from the enabled list.",
+    skill_candidate_confirm_delete_action: "Confirm Delete",
+    skill_selector_label: "Select Skill",
+    skill_selector_none: "No Skill",
+    skill_selector_empty: "No added Skills",
+    skill_selector_selected_suffix: " Skills",
+    skill_candidate_explain_go_test: "Reuses a Go test verification flow. When selected, the assistant prioritizes the recorded test command and summary, for example: {command}",
+    skill_candidate_explain_frontend_build: "Reuses a frontend build verification flow. When selected, the assistant prioritizes the recorded build command for this project, for example: {command}",
+    skill_candidate_explain_go_build: "Reuses a Go build verification flow. When selected, the assistant prioritizes the recorded build command to confirm compilation, for example: {command}",
+    skill_candidate_explain_test_workflow: "Reuses a test execution workflow. When selected, the assistant prioritizes planning and running related tests before continuing.",
+    skill_candidate_explain_build_workflow: "Reuses a build verification workflow. When selected, the assistant prioritizes running the project build and using the result as completion evidence.",
+    skill_candidate_explain_deploy_workflow: "Reuses a deployment workflow. When selected, the assistant prioritizes the deployment steps and commands recorded in this Skill.",
+    skill_candidate_explain_command: "Reuses a command workflow that appeared repeatedly in prior conversations. When selected, the assistant references and prioritizes this command: {command}",
+    skill_candidate_explain_default: "Reuses a working method distilled from prior conversations. When selected, the assistant references this Skill's description and steps.",
+
   },
 };
 
 export function t(key: TranslationKey): string {
   const lang = useSettingsStore.getState().language;
   return translations[lang]?.[key] ?? translations.en[key] ?? key;
+}
+
+export function tf(key: TranslationKey, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+    t(key),
+  );
+}
+
+export function getSkillCandidateExplanation(candidate: { name?: string; description?: string; pattern?: string; commands?: string[] }): string {
+  const command = candidate.commands?.[0] || candidate.pattern || "";
+  const lower = `${command} ${candidate.name || ""} ${candidate.description || ""}`.toLowerCase();
+
+  if (lower.includes("go test")) return tf("skill_candidate_explain_go_test", { command });
+  if (lower.includes("npm run build") || lower.includes("yarn build")) return tf("skill_candidate_explain_frontend_build", { command });
+  if (lower.includes("go build")) return tf("skill_candidate_explain_go_build", { command });
+  if (lower.includes("test_workflow") || lower.includes("test execution")) return t("skill_candidate_explain_test_workflow");
+  if (lower.includes("build_workflow") || lower.includes("build workflow")) return t("skill_candidate_explain_build_workflow");
+  if (lower.includes("deploy_workflow") || lower.includes("deploy")) return t("skill_candidate_explain_deploy_workflow");
+  if (command) return tf("skill_candidate_explain_command", { command });
+  return t("skill_candidate_explain_default");
 }
 
 // Built-in tool description translations

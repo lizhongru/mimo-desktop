@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,6 +40,10 @@ type SkillCandidate struct {
 type Distill struct {
 	config     DistillConfig
 	projectDir string
+}
+
+type enabledSkillsFile struct {
+	Skills []string `json:"skills"`
 }
 
 // NewDistill creates a new distill instance
@@ -102,10 +107,14 @@ func (d *Distill) detectCommandPatterns(data string) []SkillCandidate {
 
 	for cmd, count := range cmdCount {
 		if count >= 2 {
+			confidence := 0.6 + (float64(count-2) * 0.1)
+			if confidence > 1.0 {
+				confidence = 1.0
+			}
 			candidates = append(candidates, SkillCandidate{
 				Name:        fmt.Sprintf("skill_%s", sanitizeName(cmd)),
 				Description: fmt.Sprintf("Automated skill for: %s", cmd),
-				Confidence:  float64(count) / 10.0,
+				Confidence:  confidence,
 				Pattern:     cmd,
 				Commands:    []string{cmd},
 				CreatedAt:   time.Now(),
@@ -231,6 +240,98 @@ func (d *Distill) writeSkillFiles(skillDir string, candidates []SkillCandidate) 
 	return nil
 }
 
+// EnableCandidate marks a generated skill candidate as enabled.
+func (d *Distill) EnableCandidate(name string) error {
+	normalized, err := safeCandidateName(name)
+	if err != nil {
+		return err
+	}
+
+	skillFile := filepath.Join(d.skillsDir(), normalized, "SKILL.md")
+	if _, err := os.Stat(skillFile); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("skill candidate %s does not exist", normalized)
+		}
+		return fmt.Errorf("failed to read skill candidate %s: %w", normalized, err)
+	}
+
+	enabled, err := d.ListEnabledCandidates()
+	if err != nil {
+		return err
+	}
+	for _, existing := range enabled {
+		if existing == normalized {
+			return nil
+		}
+	}
+
+	enabled = append(enabled, normalized)
+	return d.writeEnabledCandidates(enabled)
+}
+
+// DeleteCandidate removes a generated skill candidate and disables it.
+func (d *Distill) DeleteCandidate(name string) error {
+	normalized, err := safeCandidateName(name)
+	if err != nil {
+		return err
+	}
+
+	candidateDir := filepath.Join(d.skillsDir(), normalized)
+	if err := os.RemoveAll(candidateDir); err != nil {
+		return fmt.Errorf("failed to delete skill candidate %s: %w", normalized, err)
+	}
+
+	enabled, err := d.ListEnabledCandidates()
+	if err != nil {
+		return err
+	}
+	filtered := enabled[:0]
+	for _, existing := range enabled {
+		if existing != normalized {
+			filtered = append(filtered, existing)
+		}
+	}
+	return d.writeEnabledCandidates(filtered)
+}
+
+// ListEnabledCandidates returns normalized candidate names marked as enabled.
+func (d *Distill) ListEnabledCandidates() ([]string, error) {
+	data, err := os.ReadFile(d.enabledCandidatesFile())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read enabled skills: %w", err)
+	}
+
+	var file enabledSkillsFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		return nil, fmt.Errorf("failed to parse enabled skills: %w", err)
+	}
+	return file.Skills, nil
+}
+
+func (d *Distill) writeEnabledCandidates(names []string) error {
+	if err := os.MkdirAll(d.skillsDir(), 0755); err != nil {
+		return fmt.Errorf("failed to create skill dir: %w", err)
+	}
+
+	data, err := json.MarshalIndent(enabledSkillsFile{Skills: names}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode enabled skills: %w", err)
+	}
+	data = append(data, '\n')
+	return os.WriteFile(d.enabledCandidatesFile(), data, 0644)
+}
+
+func (d *Distill) skillsDir() string {
+	return filepath.Join(d.projectDir, ".mimo", "skills")
+}
+
+func (d *Distill) enabledCandidatesFile() string {
+	return filepath.Join(d.skillsDir(), "enabled.json")
+}
+
 func renderSkillFile(name string, candidate SkillCandidate) string {
 	var content strings.Builder
 	content.WriteString("---\n")
@@ -325,7 +426,12 @@ func (d *Distill) Run(sessionDir string) (int, error) {
 		return 0, fmt.Errorf("failed to read session: %w", err)
 	}
 
-	candidates, err := d.Analyze(string(data))
+	return d.RunText(string(data))
+}
+
+// RunText analyzes session text and saves generated candidates.
+func (d *Distill) RunText(sessionData string) (int, error) {
+	candidates, err := d.Analyze(sessionData)
 	if err != nil {
 		return 0, err
 	}
@@ -344,6 +450,22 @@ func normalizeSkillName(s string) string {
 		return "skill_candidate"
 	}
 	return name
+}
+
+// SafeCandidateName validates and normalizes a generated skill candidate name.
+func SafeCandidateName(s string) (string, error) {
+	return safeCandidateName(s)
+}
+
+func safeCandidateName(s string) (string, error) {
+	if strings.Contains(s, "..") || strings.ContainsAny(s, `/\\`) {
+		return "", fmt.Errorf("invalid skill candidate name %q", s)
+	}
+	name := normalizeSkillName(s)
+	if name == "skill_candidate" && strings.TrimSpace(s) == "" {
+		return "", fmt.Errorf("invalid skill candidate name %q", s)
+	}
+	return name, nil
 }
 
 func sanitizeName(s string) string {

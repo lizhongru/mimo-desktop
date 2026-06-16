@@ -70,6 +70,14 @@ export function DeleteSession(arg1) {
   return window['go']['desktop']['App']['DeleteSession'](arg1);
 }
 
+export function DistillDeleteCandidate(arg1) {
+  return window['go']['desktop']['App']['DistillDeleteCandidate'](arg1);
+}
+
+export function DistillEnableCandidate(arg1) {
+  return window['go']['desktop']['App']['DistillEnableCandidate'](arg1);
+}
+
 export function DistillListCandidates() {
   return window['go']['desktop']['App']['DistillListCandidates']();
 }
@@ -218,8 +226,8 @@ export function SelectDirectory() {
   return window['go']['desktop']['App']['SelectDirectory']();
 }
 
-export function SendMessage(arg1, arg2) {
-  return window['go']['desktop']['App']['SendMessage'](arg1, arg2);
+export function SendMessage(arg1, arg2, arg3) {
+  return window['go']['desktop']['App']['SendMessage'](arg1, arg2, arg3);
 }
 
 export function SetDefaultModel(arg1) {

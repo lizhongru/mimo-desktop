@@ -27,6 +27,7 @@ import {
   History,
   ListTodo,
   Bot,
+  Sparkles,
   Search,
 } from "lucide-react";
 import { useSessionStore, type SessionItem } from "../../stores/sessionStore";
@@ -46,6 +47,7 @@ interface Props {
   onOpenCheckpoint: () => void;
   onOpenTask: () => void;
   onOpenActor: () => void;
+  onOpenSkill: () => void;
 }
 
 interface ContextMenuState {
@@ -270,6 +272,7 @@ export function LeftSidebar({
   onOpenCheckpoint,
   onOpenTask,
   onOpenActor,
+  onOpenSkill,
 }: Props) {
   const sessions = useSessionStore((s) => s.sessions);
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
@@ -614,6 +617,7 @@ export function LeftSidebar({
         onOpenCheckpoint={onOpenCheckpoint}
         onOpenTask={onOpenTask}
         onOpenActor={onOpenActor}
+        onOpenSkill={onOpenSkill}
       />
 
       {/* Context Menu */}
@@ -720,12 +724,14 @@ export function LeftSidebar({
     onOpenCheckpoint,
     onOpenTask,
     onOpenActor,
+    onOpenSkill,
   }: {
     onOpenSettings: () => void;
     onOpenMemory: () => void;
     onOpenCheckpoint: () => void;
     onOpenTask: () => void;
     onOpenActor: () => void;
+    onOpenSkill: () => void;
   }) {
     const language = useSettingsStore((s) => s.language);
     const theme = useSettingsStore((s) => s.theme);
@@ -824,6 +830,15 @@ export function LeftSidebar({
               >
                 <Bot className="w-3.5 h-3.5 text-txt-g" />
                 {t("actor") || "子智能体"}
+              </button>
+
+              {/* Skill */}
+              <button
+                onClick={() => { close(); onOpenSkill(); }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-txt-2 hover:bg-elevated transition-colors cursor-pointer rounded-md"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-txt-g" />
+                {t("skill_candidates")}
               </button>
 
               {/* Divider */}

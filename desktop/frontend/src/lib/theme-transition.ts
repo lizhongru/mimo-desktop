@@ -12,6 +12,7 @@ function maxRadius(x: number, y: number): number {
 /** Apply theme to DOM + persist */
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("light", theme === "light");
   document.documentElement.style.colorScheme = theme;
   try { localStorage.setItem("mimo-theme", theme); } catch (_) {}
 }

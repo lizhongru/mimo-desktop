@@ -37,6 +37,10 @@ export function DeleteCheckpoint(arg1:string):Promise<desktop.CheckpointResult>;
 
 export function DeleteSession(arg1:string):Promise<void>;
 
+export function DistillDeleteCandidate(arg1:string):Promise<desktop.DreamResult>;
+
+export function DistillEnableCandidate(arg1:string):Promise<desktop.DreamResult>;
+
 export function DistillListCandidates():Promise<Array<desktop.SkillCandidateInfo>>;
 
 export function DistillRun():Promise<desktop.DreamResult>;
@@ -111,7 +115,7 @@ export function SaveSessionFromFrontend(arg1:string,arg2:Array<desktop.ChatMessa
 
 export function SelectDirectory():Promise<string>;
 
-export function SendMessage(arg1:string,arg2:string):Promise<void>;
+export function SendMessage(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SetDefaultModel(arg1:string):Promise<void>;
 

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   ChevronDown,
   FileText,
@@ -17,9 +17,10 @@ import { t } from "../../lib/i18n";
 import { useAnimatedOpen } from "../../lib/useAnimatedOpen";
 import { type ChatAttachment, readFilesAsAttachments } from "../../lib/attachments";
 import { ModelReasoningPicker } from "./ModelReasoningPicker";
+import { SkillSelector } from "./SkillSelector";
 
 interface Props {
-  onSend: (message: string, attachments?: ChatAttachment[]) => void;
+  onSend: (message: string, attachments?: ChatAttachment[], selectedSkills?: string[]) => void;
   onCancel: () => void;
 }
 
@@ -94,6 +95,7 @@ function AttachmentIcon({ attachment }: { attachment: ChatAttachment }) {
 export function ChatInput({ onSend, onCancel }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [dragHighlight, setDragHighlight] = useState(false);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const planningMode = useSettingsStore((s) => s.planningMode);
@@ -144,11 +146,11 @@ export function ChatInput({ onSend, onCancel }: Props) {
     }
     historyIndex.current = -1;
     savedInput.current = "";
-    onSend(trimmed, attachments.length > 0 ? attachments : undefined);
+    onSend(trimmed, attachments.length > 0 ? attachments : undefined, selectedSkills);
     setText("");
     setAttachments([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [text, isStreaming, onSend, attachments]);
+  }, [text, isStreaming, onSend, attachments, selectedSkills]);
 
   const handleFiles = useCallback((files: FileList) => {
     void readFilesAsAttachments(files)
@@ -317,6 +319,8 @@ export function ChatInput({ onSend, onCancel }: Props) {
               >
                 <FolderOpen className="w-3 h-3" />
               </button>
+              <div className="w-px h-3 bg-txt-2/30 mx-0.5" />
+              <SkillSelector selected={selectedSkills} onChange={setSelectedSkills} />
               <div className="w-px h-3 bg-txt-2/30 mx-0.5" />
               <Dropdown
                 icon={Route}

@@ -679,9 +679,11 @@ export namespace desktop {
 	export class SkillCandidateInfo {
 	    name: string;
 	    description: string;
+	    explanation: string;
 	    confidence: number;
 	    pattern?: string;
 	    commands?: string[];
+	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SkillCandidateInfo(source);
@@ -691,9 +693,11 @@ export namespace desktop {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.description = source["description"];
+	        this.explanation = source["explanation"];
 	        this.confidence = source["confidence"];
 	        this.pattern = source["pattern"];
 	        this.commands = source["commands"];
+	        this.enabled = source["enabled"];
 	    }
 	}
 	export class TaskEventInfo {
