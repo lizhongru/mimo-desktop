@@ -1,4 +1,4 @@
-import { useSettingsStore } from "../stores/settingsStore";
+﻿import { useSettingsStore } from "../stores/settingsStore";
 
 type TranslationKey =
   | "settings"
@@ -70,6 +70,10 @@ type TranslationKey =
   | "version_label"
   | "empty_hint"
   | "thinking_label"
+  | "thinking_live_analyzing"
+  | "thinking_live_responding"
+  | "thinking_live_tools_prefix"
+  | "thinking_live_tools_suffix"
   | "input_placeholder"
   | "cancel_esc"
   | "send_enter"
@@ -352,6 +356,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     version_label: "0.3.0",
     empty_hint: "输入消息开始对话",
     thinking_label: "思考中",
+    thinking_live_analyzing: "正在分析请求...",
+    thinking_live_responding: "正在组织回复...",
+    thinking_live_tools_prefix: "正在执行 ",
+    thinking_live_tools_suffix: " 个工具调用...",
     input_placeholder: "输入消息... (Shift+Enter 换行)",
     cancel_esc: "取消 (Esc)",
     send_enter: "发送 (Enter)",
@@ -627,6 +635,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     version_label: "0.3.0",
     empty_hint: "Type a message to get started",
     thinking_label: "Thinking",
+    thinking_live_analyzing: "Analyzing request...",
+    thinking_live_responding: "Composing response...",
+    thinking_live_tools_prefix: "Running ",
+    thinking_live_tools_suffix: " tool call(s)...",
     input_placeholder: "Type a message... (Shift+Enter for new line)",
     cancel_esc: "Cancel (Esc)",
     send_enter: "Send (Enter)",

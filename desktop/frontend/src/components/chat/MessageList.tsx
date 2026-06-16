@@ -8,10 +8,17 @@ import { t } from "../../lib/i18n";
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const isThinking = useChatStore((s) => s.isThinking);
   const currentDelta = useChatStore((s) => s.currentDelta);
   const currentThinking = useChatStore((s) => s.currentThinking);
   const currentToolCalls = useChatStore((s) => s.currentToolCalls);
+  const runningToolCount = currentToolCalls.filter((toolCall) => toolCall.status === "running").length;
+  const processLabel = currentThinking
+    ? t("thinking_live_analyzing")
+    : runningToolCount > 0
+      ? `${t("thinking_live_tools_prefix")}${runningToolCount}${t("thinking_live_tools_suffix")}`
+      : currentDelta
+        ? t("thinking_live_responding")
+        : t("thinking_live_analyzing");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -186,7 +193,7 @@ export function MessageList() {
           </div>
 
           <div className="max-w-[80%] rounded-2xl px-4 py-2.5 border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] shadow-sm select-text">
-            {(currentThinking || isThinking) && <ThinkingBlock content={currentThinking} isLive />}
+            <ThinkingBlock content={currentThinking} isLive label={processLabel} />
 
             {currentToolCalls.map((tc) => (
               <ToolCallCard key={tc.id} toolCall={tc} />
@@ -194,10 +201,6 @@ export function MessageList() {
 
             {currentDelta && (
               <div className="whitespace-pre-wrap">{currentDelta}</div>
-            )}
-
-            {!currentDelta && !currentThinking && currentToolCalls.length === 0 && (
-              <ThinkingBlock content="" isLive />
             )}
           </div>
         </div>

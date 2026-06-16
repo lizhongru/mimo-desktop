@@ -6,6 +6,7 @@ import { t } from "../../lib/i18n";
 interface Props {
   content: string;
   isLive?: boolean;
+  label?: string;
 }
 
 function DnaHelix() {
@@ -26,7 +27,7 @@ function DnaHelix() {
   );
 }
 
-export function ThinkingBlock({ content, isLive }: Props) {
+export function ThinkingBlock({ content, isLive, label }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   if (!content && !isLive) return null;
@@ -58,11 +59,9 @@ export function ThinkingBlock({ content, isLive }: Props) {
           {isLive ? <DnaHelix /> : <Brain className="h-3.5 w-3.5" />}
         </span>
 
-        {!isLive && (
-          <span className="italic">
-            {expanded ? t("thinking_label") : preview || t("thinking_label")}
-          </span>
-        )}
+        <span className={clsx("italic", isLive && "not-italic")}>
+          {isLive ? label || t("thinking_live_analyzing") : expanded ? t("thinking_label") : preview || t("thinking_label")}
+        </span>
       </button>
 
       {expanded && content && (
