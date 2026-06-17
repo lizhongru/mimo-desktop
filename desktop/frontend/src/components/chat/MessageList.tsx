@@ -4,6 +4,7 @@ import { MessageBubble } from "./MessageBubble";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallCard } from "./ToolCallCard";
 import { t } from "../../lib/i18n";
+import { getSkillCommandLabel, useSkillCommands } from "../../hooks/useSkillCommands";
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
@@ -26,6 +27,8 @@ export function MessageList() {
   const selectionHighlightRef = useRef<HTMLDivElement | null>(null);
   const selectedTextRef = useRef("");
   const previousMessageCount = useRef(0);
+  const skillCommands = useSkillCommands();
+  const activeSelectedSkills = [...messages].reverse().find((message) => message.role === "user")?.selectedSkills || [];
 
   // Jump immediately for loaded history; smooth-scroll only for live streaming deltas.
   useLayoutEffect(() => {
@@ -181,7 +184,7 @@ export function MessageList() {
       )}
 
       {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
+        <MessageBubble key={msg.id} message={msg} skillCommands={skillCommands} />
       ))}
 
       {isStreaming && (
@@ -193,6 +196,26 @@ export function MessageList() {
           </div>
 
           <div className="max-w-[80%] rounded-2xl px-4 py-2.5 border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] shadow-sm select-text">
+            {activeSelectedSkills.length > 0 && (
+              <div className="mb-2 rounded-lg border border-[var(--color-accent)]/20 bg-[var(--color-accent)]/5 px-3 py-2 text-xs text-[var(--text-secondary)]">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium text-[var(--color-accent)]">{t("skill_run_status_title")}</span>
+                  {activeSelectedSkills.map((skill) => (
+                    <span key={skill} className="max-w-[220px] truncate rounded-full bg-[var(--color-accent)]/10 px-2 py-0.5 font-mono text-[11px] text-[var(--color-accent)]" title={skill}>
+                      {getSkillCommandLabel(skill, skillCommands)}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-txt-g">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-2 w-2 rounded-full bg-[var(--color-accent)]/40 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--color-accent)]" />
+                  </span>
+                  <span>{runningToolCount > 0 ? t("skill_run_status_running_tools") : currentDelta ? t("skill_run_status_summarizing") : t("skill_run_status_preparing")}</span>
+                </div>
+              </div>
+            )}
+
             <ThinkingBlock content={currentThinking} isLive label={processLabel} />
 
             {currentToolCalls.map((tc) => (

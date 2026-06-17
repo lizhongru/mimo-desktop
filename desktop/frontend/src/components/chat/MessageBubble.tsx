@@ -7,6 +7,7 @@ import { t } from "../../lib/i18n";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallCard } from "./ToolCallCard";
+import { getSkillCommandLabel } from "../../hooks/useSkillCommands";
 
 
 function ToolCallsBlock({ toolCalls }: { toolCalls?: ToolCallEvent[] }) {
@@ -65,9 +66,10 @@ function ToolCallsBlock({ toolCalls }: { toolCalls?: ToolCallEvent[] }) {
 
 interface Props {
   message: ChatMessage;
+  skillCommands?: Record<string, string>;
 }
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, skillCommands = {} }: Props) {
   const isUser = message.role === "user";
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -184,7 +186,7 @@ export function MessageBubble({ message }: Props) {
                 className="max-w-[160px] truncate rounded-full border border-[var(--color-accent)]/25 bg-[var(--color-accent)]/10 px-2 py-0.5 text-[var(--color-accent)]"
                 title={skill}
               >
-                {skill}
+                {getSkillCommandLabel(skill, skillCommands)}
               </span>
             ))}
           </div>

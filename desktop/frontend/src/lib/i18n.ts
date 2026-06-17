@@ -277,6 +277,10 @@ type TranslationKey =
   | "skill_candidate_explain_command"
   | "skill_candidate_explain_default"
   | "message_selected_skills"
+  | "skill_run_status_title"
+  | "skill_run_status_preparing"
+  | "skill_run_status_running_tools"
+  | "skill_run_status_summarizing"
   | "add_selection_to_chat"
   | "copied"
   | "regenerating"
@@ -843,6 +847,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     skill_candidate_explain_command: "Reuses a command workflow that appeared repeatedly in prior conversations. When selected, the assistant references and prioritizes this command: {command}",
     skill_candidate_explain_default: "Reuses a working method distilled from prior conversations. When selected, the assistant references this Skill's description and steps.",
     message_selected_skills: "Used this turn",
+    skill_run_status_title: "Running selected Skill",
+    skill_run_status_preparing: "Preparing Skill command...",
+    skill_run_status_running_tools: "Waiting for tool result...",
+    skill_run_status_summarizing: "Skill command finished, summarizing...",
     add_selection_to_chat: "Add to chat",
     copied: "Copied",
     regenerating: "Regenerating...",
