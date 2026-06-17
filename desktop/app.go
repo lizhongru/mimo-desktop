@@ -220,6 +220,7 @@ func buildEnabledProjectSkillsContext(projectDir string, selectedSkills []string
 	}
 
 	var content strings.Builder
+	var selectedCommands []string
 	for _, name := range names {
 		normalized, err := skill.SafeCandidateName(name)
 		if err != nil {
@@ -229,9 +230,11 @@ func buildEnabledProjectSkillsContext(projectDir string, selectedSkills []string
 		if err != nil {
 			continue
 		}
+		selectedCommands = append(selectedCommands, extractSkillCommands(string(skillData))...)
 		if content.Len() == 0 {
 			content.WriteString("## Selected Project Skills\n\n")
 			content.WriteString("The user explicitly selected the following project skills for this turn. Treat them as active instructions for the current request, not as optional background context.\n")
+			content.WriteString("The selected skills override prior conversation interpretations of similar user phrases. If the user repeats a previous request, reinterpret it according to the skills selected for this current turn.\n")
 			content.WriteString("Apply the selected skill workflow before doing broad project exploration. If a selected skill contains commands, run those exact commands unless they are unsafe or impossible, and explain any deviation to the user.\n")
 		}
 		content.WriteString("\n### ")
@@ -240,7 +243,38 @@ func buildEnabledProjectSkillsContext(projectDir string, selectedSkills []string
 		content.Write(skillData)
 		content.WriteString("\n")
 	}
+	if len(selectedCommands) > 0 {
+		content.WriteString("\n## Current Turn Selected Skill Commands\n\n")
+		content.WriteString("Execute these selected Skill commands first, before substituting broader project tests or reusing prior interpretations:\n")
+		for _, command := range selectedCommands {
+			content.WriteString("- ")
+			content.WriteString(command)
+			content.WriteString("\n")
+		}
+	}
 	return strings.TrimSpace(content.String())
+}
+
+func extractSkillCommands(skillMarkdown string) []string {
+	var commands []string
+	inCommands := false
+	seen := make(map[string]bool)
+	for _, line := range strings.Split(skillMarkdown, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") {
+			inCommands = strings.EqualFold(trimmed, "## Commands")
+			continue
+		}
+		if !inCommands || !strings.HasPrefix(trimmed, "- `") || !strings.HasSuffix(trimmed, "`") {
+			continue
+		}
+		command := strings.TrimSuffix(strings.TrimPrefix(trimmed, "- `"), "`")
+		if command != "" && !seen[command] {
+			commands = append(commands, command)
+			seen[command] = true
+		}
+	}
+	return commands
 }
 
 func (a *App) buildSystemPrompt(projectDir string, selectedSkills ...string) string {

@@ -45,7 +45,7 @@ func TestBuildSystemPromptIncludesEnabledProjectSkills(t *testing.T) {
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
 		t.Fatalf("create skill dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: test_skill\ndescription: Test skill\n---\n\n# test_skill\n\nCUSTOM ENABLED SKILL SENTINEL"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: test_skill\ndescription: Test skill\n---\n\n# test_skill\n\nCUSTOM ENABLED SKILL SENTINEL\n\n## Commands\n\n- `npm run build`"), 0644); err != nil {
 		t.Fatalf("write skill file: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"), []byte(`{"skills":["test_skill"]}`), 0644); err != nil {
@@ -68,6 +68,12 @@ func TestBuildSystemPromptIncludesEnabledProjectSkills(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "run those exact commands") {
 		t.Fatalf("system prompt should instruct agent to apply selected skill commands")
+	}
+	if !strings.Contains(prompt, "override prior conversation interpretations") {
+		t.Fatalf("system prompt should isolate selected skills from prior context interpretations")
+	}
+	if !strings.Contains(prompt, "## Current Turn Selected Skill Commands") || !strings.Contains(prompt, "- npm run build") {
+		t.Fatalf("system prompt should list current turn selected skill commands")
 	}
 	if !strings.Contains(prompt, "CUSTOM ENABLED SKILL SENTINEL") {
 		t.Fatalf("system prompt does not include enabled skill content")
