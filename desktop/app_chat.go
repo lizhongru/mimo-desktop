@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/mimo-cli/mimo-cli/internal/llm"
+	"github.com/mimo-cli/mimo-cli/internal/skill"
 	"github.com/mimo-cli/mimo-cli/internal/tools"
 )
 
@@ -55,6 +56,7 @@ func (a *App) SendMessage(message string, attachmentsJSON string, selectedSkills
 	if workingDir != "" {
 		ctx = tools.WithWorkingDir(ctx, workingDir)
 	}
+	directSkillRuns := selectedCommandOnlySkillRuns(workingDir, selectedSkills)
 	a.mu.Lock()
 	a.cancelChat = cancel
 	a.mu.Unlock()
@@ -78,6 +80,23 @@ func (a *App) SendMessage(message string, attachmentsJSON string, selectedSkills
 		}
 
 		start := time.Now()
+		if len(directSkillRuns) > 0 && len(attachments) == 0 {
+			runResults, err := a.runSelectedSkillCommands(ctx, directSkillRuns)
+			duration := time.Since(start)
+
+			if err != nil {
+				runtime.EventsEmit(a.ctx, EventChatError, err.Error())
+				return
+			}
+
+			runtime.EventsEmit(a.ctx, EventChatDone, map[string]interface{}{
+				"response":        "",
+				"duration":        duration.Milliseconds(),
+				"directSkillRuns": runResults,
+			})
+			return
+		}
+
 		response, err := a.agent.ChatStream(ctx, message, attachments)
 		duration := time.Since(start)
 
@@ -93,6 +112,156 @@ func (a *App) SendMessage(message string, attachmentsJSON string, selectedSkills
 	}()
 
 	return nil
+}
+
+type selectedSkillCommandRun struct {
+	Skill      string
+	Command    string
+	WorkingDir string
+}
+
+type directSkillCommandResult struct {
+	Skill      string  `json:"skill"`
+	Command    string  `json:"command"`
+	WorkingDir string  `json:"workingDir"`
+	Duration   float64 `json:"duration"`
+	Output     string  `json:"output,omitempty"`
+	Error      string  `json:"error,omitempty"`
+}
+
+func selectedCommandOnlySkillRuns(projectDir string, selectedSkills []string) []selectedSkillCommandRun {
+	if projectDir == "" || len(selectedSkills) == 0 {
+		return nil
+	}
+
+	data, err := os.ReadFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"))
+	if err != nil {
+		return nil
+	}
+
+	var enabled enabledProjectSkillsFile
+	if err := json.Unmarshal(data, &enabled); err != nil || len(enabled.Skills) == 0 {
+		return nil
+	}
+
+	allowed := make(map[string]bool, len(enabled.Skills))
+	for _, name := range enabled.Skills {
+		normalized, err := skill.SafeCandidateName(name)
+		if err == nil {
+			allowed[normalized] = true
+		}
+	}
+
+	var runs []selectedSkillCommandRun
+	for _, name := range selectedSkills {
+		normalized, err := skill.SafeCandidateName(name)
+		if err != nil || !allowed[normalized] {
+			continue
+		}
+		skillPath := filepath.Join(projectDir, ".mimo", "skills", normalized, "SKILL.md")
+		skillData, err := os.ReadFile(skillPath)
+		if err != nil {
+			continue
+		}
+		commands := extractSkillCommands(string(skillData))
+		if len(commands) == 0 || !isCommandOnlySkill(string(skillData)) {
+			return nil
+		}
+		for _, command := range commands {
+			if !isDirectSkillCommandAllowed(command) {
+				return nil
+			}
+			runs = append(runs, selectedSkillCommandRun{
+				Skill:      normalized,
+				Command:    command,
+				WorkingDir: resolveSkillCommandWorkingDir(projectDir, command),
+			})
+		}
+	}
+	return runs
+}
+
+func isCommandOnlySkill(skillMarkdown string) bool {
+	commands := extractSkillCommands(skillMarkdown)
+	if len(commands) == 0 {
+		return false
+	}
+	for _, line := range strings.Split(skillMarkdown, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") {
+			heading := strings.TrimSpace(strings.TrimPrefix(trimmed, "## "))
+			if !strings.EqualFold(heading, "Commands") && !strings.EqualFold(heading, "Pattern") {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isDirectSkillCommandAllowed(command string) bool {
+	trimmed := strings.TrimSpace(command)
+	allowedPrefixes := []string{
+		"npm run ",
+		"pnpm run ",
+		"yarn ",
+		"go test",
+		"go vet",
+		"go build",
+		"cargo test",
+		"cargo build",
+		"pytest",
+		"python -m pytest",
+	}
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(trimmed, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveSkillCommandWorkingDir(projectDir, command string) string {
+	if strings.HasPrefix(strings.TrimSpace(command), "npm run ") {
+		frontendDir := filepath.Join(projectDir, "desktop", "frontend")
+		if _, err := os.Stat(filepath.Join(frontendDir, "package.json")); err == nil {
+			return frontendDir
+		}
+		if _, err := os.Stat(filepath.Join(projectDir, "package.json")); err == nil {
+			return projectDir
+		}
+	}
+	return projectDir
+}
+
+func (a *App) runSelectedSkillCommands(ctx context.Context, runs []selectedSkillCommandRun) ([]directSkillCommandResult, error) {
+	results := make([]directSkillCommandResult, 0, len(runs))
+	for _, run := range runs {
+		args := map[string]interface{}{
+			"command":     run.Command,
+			"working_dir": run.WorkingDir,
+			"timeout":     120,
+		}
+		argsJSON, _ := json.Marshal(args)
+		runtime.EventsEmit(a.ctx, EventToolCall, "shell", string(argsJSON))
+
+		result, err := tools.NewShellTool().Execute(ctx, args)
+		if err != nil {
+			return nil, err
+		}
+		resultJSON, _ := json.Marshal(result)
+		runtime.EventsEmit(a.ctx, EventToolResult, "shell", string(resultJSON))
+
+		results = append(results, directSkillCommandResult{
+			Skill:      run.Skill,
+			Command:    run.Command,
+			WorkingDir: run.WorkingDir,
+			Duration:   result.Duration,
+			Output:     result.Output,
+			Error:      result.Error,
+		})
+	}
+
+	return results, nil
 }
 
 // CancelOperation cancels the current agent operation.

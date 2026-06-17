@@ -281,6 +281,14 @@ type TranslationKey =
   | "skill_run_status_preparing"
   | "skill_run_status_running_tools"
   | "skill_run_status_summarizing"
+  | "skill_direct_summary_intro"
+  | "skill_direct_summary_skill"
+  | "skill_direct_summary_command"
+  | "skill_direct_summary_directory"
+  | "skill_direct_summary_duration"
+  | "skill_direct_summary_result_success"
+  | "skill_direct_summary_result_failed"
+  | "skill_direct_summary_output"
   | "add_selection_to_chat"
   | "copied"
   | "regenerating"
@@ -572,6 +580,14 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     skill_run_status_preparing: "正在准备执行 Skill 命令...",
     skill_run_status_running_tools: "正在等待工具结果...",
     skill_run_status_summarizing: "Skill 命令已执行，正在总结...",
+    skill_direct_summary_intro: "已按你手动选择的 Skill 直接执行命令，未进入 agent 自主规划。",
+    skill_direct_summary_skill: "Skill：{skill}",
+    skill_direct_summary_command: "命令：`{command}`",
+    skill_direct_summary_directory: "目录：`{directory}`",
+    skill_direct_summary_duration: "耗时：{duration}s",
+    skill_direct_summary_result_success: "结果：成功",
+    skill_direct_summary_result_failed: "结果：失败（{error}）",
+    skill_direct_summary_output: "输出摘要：\n{output}",
 
   },
   en: {
@@ -856,6 +872,14 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     skill_run_status_preparing: "Preparing Skill command...",
     skill_run_status_running_tools: "Waiting for tool result...",
     skill_run_status_summarizing: "Skill command finished, summarizing...",
+    skill_direct_summary_intro: "Executed the command from your selected Skill directly, without agent autonomous planning.",
+    skill_direct_summary_skill: "Skill: {skill}",
+    skill_direct_summary_command: "Command: `{command}`",
+    skill_direct_summary_directory: "Directory: `{directory}`",
+    skill_direct_summary_duration: "Duration: {duration}s",
+    skill_direct_summary_result_success: "Result: succeeded",
+    skill_direct_summary_result_failed: "Result: failed ({error})",
+    skill_direct_summary_output: "Output summary:\n{output}",
     add_selection_to_chat: "Add to chat",
     copied: "Copied",
     regenerating: "Regenerating...",

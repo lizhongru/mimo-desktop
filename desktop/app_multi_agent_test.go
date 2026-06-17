@@ -39,6 +39,79 @@ func TestBuildSystemPromptIncludesCurrentAgentPrompt(t *testing.T) {
 	}
 }
 
+func TestSelectedCommandOnlySkillRunsDirectly(t *testing.T) {
+	projectDir := t.TempDir()
+	skillDir := filepath.Join(projectDir, ".mimo", "skills", "skill_npm_run_build")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: skill_npm_run_build\ndescription: Run frontend build\n---\n\n# skill_npm_run_build\n\nRun frontend build\n\n## Pattern\n\n```text\nnpm run build\n```\n\n## Commands\n\n- `npm run build`\n"), 0644); err != nil {
+		t.Fatalf("write skill file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"), []byte(`{"skills":["skill_npm_run_build"]}`), 0644); err != nil {
+		t.Fatalf("write enabled skills: %v", err)
+	}
+	frontendDir := filepath.Join(projectDir, "desktop", "frontend")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatalf("create frontend dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(frontendDir, "package.json"), []byte(`{"scripts":{"build":"vite build"}}`), 0644); err != nil {
+		t.Fatalf("write package json: %v", err)
+	}
+
+	runs := selectedCommandOnlySkillRuns(projectDir, []string{"skill_npm_run_build"})
+	if len(runs) != 1 {
+		t.Fatalf("expected one direct skill command, got %#v", runs)
+	}
+	if runs[0].Skill != "skill_npm_run_build" {
+		t.Fatalf("skill = %q", runs[0].Skill)
+	}
+	if runs[0].Command != "npm run build" {
+		t.Fatalf("command = %q", runs[0].Command)
+	}
+	if runs[0].WorkingDir != frontendDir {
+		t.Fatalf("working dir = %q, want %q", runs[0].WorkingDir, frontendDir)
+	}
+}
+
+func TestSelectedCommandOnlySkillSkipsComplexWorkflow(t *testing.T) {
+	projectDir := t.TempDir()
+	skillDir := filepath.Join(projectDir, ".mimo", "skills", "complex_skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: complex_skill\ndescription: Complex workflow\n---\n\n# complex_skill\n\n## Workflow\n\nInspect files first.\n\n## Commands\n\n- `npm run build`\n"), 0644); err != nil {
+		t.Fatalf("write skill file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"), []byte(`{"skills":["complex_skill"]}`), 0644); err != nil {
+		t.Fatalf("write enabled skills: %v", err)
+	}
+
+	runs := selectedCommandOnlySkillRuns(projectDir, []string{"complex_skill"})
+	if len(runs) != 0 {
+		t.Fatalf("expected complex workflow to fall back to agent, got %#v", runs)
+	}
+}
+
+func TestSelectedCommandOnlySkillSkipsUnsafeCommand(t *testing.T) {
+	projectDir := t.TempDir()
+	skillDir := filepath.Join(projectDir, ".mimo", "skills", "unsafe_skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: unsafe_skill\ndescription: Unsafe command\n---\n\n# unsafe_skill\n\n## Commands\n\n- `rm -rf .`\n"), 0644); err != nil {
+		t.Fatalf("write skill file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".mimo", "skills", "enabled.json"), []byte(`{"skills":["unsafe_skill"]}`), 0644); err != nil {
+		t.Fatalf("write enabled skills: %v", err)
+	}
+
+	runs := selectedCommandOnlySkillRuns(projectDir, []string{"unsafe_skill"})
+	if len(runs) != 0 {
+		t.Fatalf("expected unsafe command to fall back to agent, got %#v", runs)
+	}
+}
+
 func TestBuildSystemPromptIncludesEnabledProjectSkills(t *testing.T) {
 	projectDir := t.TempDir()
 	skillDir := filepath.Join(projectDir, ".mimo", "skills", "test_skill")

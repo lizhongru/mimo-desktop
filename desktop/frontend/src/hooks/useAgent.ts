@@ -3,8 +3,43 @@ import { EventsOn, EVENTS } from "../lib/events";
 import { useChatStore } from "../stores/chatStore";
 import { useActivityStore } from "../stores/activityStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { t } from "../lib/i18n";
+import { t, tf } from "../lib/i18n";
 import type { AgentUsage, ConfirmAction } from "../lib/types";
+
+type DirectSkillRunResult = {
+  skill: string;
+  command: string;
+  workingDir: string;
+  duration: number;
+  output?: string;
+  error?: string;
+};
+
+function summarizeDirectSkillOutput(output?: string): string {
+  const trimmed = (output || "").trim();
+  if (!trimmed) return "";
+  const lines = trimmed.split("\n");
+  return lines.slice(-20).join("\n").trim();
+}
+
+function formatDirectSkillResponse(runs?: DirectSkillRunResult[]): string | null {
+  if (!runs?.length) return null;
+  const blocks = runs.map((run) => {
+    const lines = [
+      tf("skill_direct_summary_skill", { skill: run.skill }),
+      tf("skill_direct_summary_command", { command: run.command }),
+      tf("skill_direct_summary_directory", { directory: run.workingDir }),
+      tf("skill_direct_summary_duration", { duration: run.duration.toFixed(1) }),
+      run.error
+        ? tf("skill_direct_summary_result_failed", { error: run.error })
+        : t("skill_direct_summary_result_success"),
+    ];
+    const output = summarizeDirectSkillOutput(run.output);
+    if (output) lines.push(tf("skill_direct_summary_output", { output }));
+    return lines.join("\n");
+  });
+  return [t("skill_direct_summary_intro"), ...blocks].join("\n\n");
+}
 
 export function useAgent() {
   const store = useChatStore;
@@ -186,14 +221,15 @@ export function useAgent() {
 
     unsubs.push(
       EventsOn(EVENTS.CHAT_DONE, (...args: unknown[]) => {
-        const data = args[0] as { response: string; duration: number };
+        const data = args[0] as { response: string; duration: number; directSkillRuns?: DirectSkillRunResult[] };
+        const responseText = formatDirectSkillResponse(data.directSkillRuns) || data.response;
         const state = store.getState();
         const activeSid = state.activeSessionId;
         const backgroundSid = state.backgroundSessionId;
         const currentSid = useSessionStore.getState().currentSessionId;
         const targetBackgroundSid = backgroundSid || (activeSid && activeSid !== currentSid ? activeSid : null);
         if (targetBackgroundSid && targetBackgroundSid !== currentSid) {
-          const finalMsgs = store.getState().finalizeBackgroundResponse(data.response, data.duration);
+          const finalMsgs = store.getState().finalizeBackgroundResponse(responseText, data.duration);
           store.getState().setSessionSnapshot(targetBackgroundSid, finalMsgs);
           const dto = toFrontendDto(finalMsgs);
           window.go?.desktop?.App?.SaveSessionFromFrontend?.(targetBackgroundSid, dto).then(() => store.getState().clearSessionSnapshot(targetBackgroundSid)).catch(console.error);
@@ -201,9 +237,9 @@ export function useAgent() {
           return;
         }
         const currentState = store.getState();
-        const response = data.response || currentState.currentDelta;
+        const response = responseText || currentState.currentDelta;
         const finalMsgs = [...currentState.messages, { id: 'final-' + Date.now(), role: 'assistant' as const, content: response, thinking: currentState.currentThinking || undefined, toolCalls: currentState.currentToolCalls.length > 0 ? [...currentState.currentToolCalls] : undefined, duration: data.duration, timestamp: Date.now() }];
-        store.getState().finalizeResponse(data.response, data.duration);
+        store.getState().finalizeResponse(response, data.duration);
         if (currentSid) {
           store.getState().setSessionSnapshot(currentSid, finalMsgs);
           window.go?.desktop?.App?.SaveSessionFromFrontend?.(currentSid, toFrontendDto(finalMsgs)).then(() => store.getState().clearSessionSnapshot(currentSid)).catch(console.error);
