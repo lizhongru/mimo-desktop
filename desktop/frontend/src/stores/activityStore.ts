@@ -7,6 +7,8 @@ export interface ActivityEntry {
   detail: string;
   status: "running" | "done" | "error";
   timestamp: number;
+  lastUpdated: number;
+  count: number;
 }
 
 export interface FileDiff {
@@ -39,12 +41,27 @@ interface ActivityState {
   addFileDiff: (diff: FileDiff) => void;
   setPlan: (plan: PlanInfo | null) => void;
   updatePlanStep: (stepId: number, status: PlanStep["status"]) => void;
+  pruneOldEntries: () => void;
   toggleRightSidebar: () => void;
   setRightSidebarOpen: (open: boolean) => void;
   clear: () => void;
 }
 
 let nextId = 1;
+
+const MAX_ACTIVITY_ENTRIES = 12;
+const DONE_ENTRY_TTL_MS = 45_000;
+const ERROR_ENTRY_TTL_MS = 120_000;
+
+function compactEntries(entries: ActivityEntry[], now = Date.now()): ActivityEntry[] {
+  return entries
+    .filter((entry) => {
+      if (entry.status === "running") return true;
+      const ttl = entry.status === "error" ? ERROR_ENTRY_TTL_MS : DONE_ENTRY_TTL_MS;
+      return now - entry.lastUpdated <= ttl;
+    })
+    .slice(0, MAX_ACTIVITY_ENTRIES);
+}
 
 export const useActivityStore = create<ActivityState>((set) => ({
   entries: [],
@@ -53,20 +70,45 @@ export const useActivityStore = create<ActivityState>((set) => ({
   rightSidebarOpen: false,
 
   addEntry: (entry) =>
-    set((s) => ({
-      entries: [
-        { ...entry, id: `act-${nextId++}`, timestamp: Date.now() },
-        ...s.entries,
-      ].slice(0, 100), // keep last 100
-      rightSidebarOpen: true,
-    })),
+    set((s) => {
+      const now = Date.now();
+      const existingIndex = s.entries.findIndex(
+        (existing) => existing.type === entry.type && existing.name === entry.name
+      );
+      const entries = [...s.entries];
+      if (existingIndex >= 0) {
+        const existing = entries[existingIndex];
+        entries.splice(existingIndex, 1);
+        entries.unshift({
+          ...existing,
+          ...entry,
+          detail: entry.detail || existing.detail,
+          count: existing.count + 1,
+          lastUpdated: now,
+        });
+      } else {
+        entries.unshift({
+          ...entry,
+          id: `act-${nextId++}`,
+          timestamp: now,
+          lastUpdated: now,
+          count: 1,
+        });
+      }
+      return {
+        entries: compactEntries(entries, now),
+        rightSidebarOpen: true,
+      };
+    }),
 
   updateEntry: (name, updates) =>
-    set((s) => ({
-      entries: s.entries.map((e) =>
-        e.name === name ? { ...e, ...updates } : e
-      ),
-    })),
+    set((s) => {
+      const now = Date.now();
+      const entries = s.entries.map((entry) =>
+        entry.name === name ? { ...entry, ...updates, lastUpdated: now } : entry
+      );
+      return { entries: compactEntries(entries, now) };
+    }),
 
   addFileDiff: (diff) =>
     set((s) => {
@@ -93,6 +135,9 @@ export const useActivityStore = create<ActivityState>((set) => ({
         },
       };
     }),
+
+  pruneOldEntries: () =>
+    set((s) => ({ entries: compactEntries(s.entries) })),
 
   toggleRightSidebar: () =>
     set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),

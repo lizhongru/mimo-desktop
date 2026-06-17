@@ -73,6 +73,13 @@ export function useAgent() {
     };
 
     unsubs.push(
+      EventsOn(EVENTS.CHAT_START, () => {
+        if (!isActiveSession()) return;
+        activity.getState().clear();
+      })
+    );
+
+    unsubs.push(
       EventsOn(EVENTS.DELTA, (...args: unknown[]) => {
         if (isBackgroundSession()) {
           store.getState().appendBackgroundDelta(args[0] as string);

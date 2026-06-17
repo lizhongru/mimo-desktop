@@ -60,6 +60,7 @@ export function AppLayout({
   const messages = useChatStore((s) => s.messages);
   const leftOpen = useSessionStore((s) => s.leftSidebarOpen);
   const rightOpen = useActivityStore((s) => s.rightSidebarOpen);
+  const pruneOldEntries = useActivityStore((s) => s.pruneOldEntries);
   const confirmAction = useChatStore((s) => s.confirmAction);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -80,6 +81,11 @@ export function AppLayout({
       .then(setIsMaximised)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(pruneOldEntries, 10_000);
+    return () => window.clearInterval(timer);
+  }, [pruneOldEntries]);
 
   const handleMinimise = useCallback(() => {
     window.go?.desktop?.App?.WindowMinimise?.().catch(console.error);

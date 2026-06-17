@@ -48,8 +48,13 @@ function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
         )}
         {statusIcon}
         <span className="font-mono text-txt-2 truncate">{entry.name}</span>
+        {entry.count > 1 && (
+          <span className="px-1.5 py-0.5 rounded-full bg-elevated text-[10px] text-txt-m flex-shrink-0">
+            ×{entry.count}
+          </span>
+        )}
         <span className="ml-auto text-txt-m text-[10px] flex-shrink-0">
-          {new Date(entry.timestamp).toLocaleTimeString(undefined, {
+          {new Date(entry.lastUpdated).toLocaleTimeString(undefined, {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
