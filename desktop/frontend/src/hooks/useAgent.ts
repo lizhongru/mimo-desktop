@@ -4,6 +4,7 @@ import { useChatStore } from "../stores/chatStore";
 import { useActivityStore } from "../stores/activityStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { t, tf } from "../lib/i18n";
+import { summarizeCommandOutput } from "../lib/commandOutput";
 import type { AgentUsage, ConfirmAction } from "../lib/types";
 
 type DirectSkillRunResult = {
@@ -14,13 +15,6 @@ type DirectSkillRunResult = {
   output?: string;
   error?: string;
 };
-
-function summarizeDirectSkillOutput(output?: string): string {
-  const trimmed = (output || "").trim();
-  if (!trimmed) return "";
-  const lines = trimmed.split("\n");
-  return lines.slice(-20).join("\n").trim();
-}
 
 function formatDirectSkillResponse(runs?: DirectSkillRunResult[]): string | null {
   if (!runs?.length) return null;
@@ -34,7 +28,7 @@ function formatDirectSkillResponse(runs?: DirectSkillRunResult[]): string | null
         ? tf("skill_direct_summary_result_failed", { error: run.error })
         : t("skill_direct_summary_result_success"),
     ];
-    const output = summarizeDirectSkillOutput(run.output);
+    const output = summarizeCommandOutput(run.output);
     if (output) lines.push(tf("skill_direct_summary_output", { output }));
     return lines.join("\n");
   });

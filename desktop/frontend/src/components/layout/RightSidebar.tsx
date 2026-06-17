@@ -17,11 +17,13 @@ import { useActivityStore, type ActivityEntry } from "../../stores/activityStore
 import { FileTree, FileTreeRefreshButton } from "../file/FileTree";
 import { FilePreviewModal, type FilePreviewData } from "../file/FilePreviewModal";
 import { t } from "../../lib/i18n";
+import { stripAnsi } from "../../lib/commandOutput";
 
 // ── Activity ───────────────────────────────────────────
 
 function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
   const [expanded, setExpanded] = useState(false);
+  const cleanDetail = stripAnsi(entry.detail);
 
   const statusIcon =
     entry.status === "running" ? (
@@ -63,9 +65,9 @@ function ActivityEntryItem({ entry }: { entry: ActivityEntry }) {
       </button>
       {expanded && entry.detail && (
         <pre className="px-5 pb-2 text-[11px] text-txt-g whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
-          {entry.detail.length > 500
-            ? entry.detail.slice(0, 500) + "..."
-            : entry.detail}
+          {cleanDetail.length > 500
+            ? cleanDetail.slice(0, 500) + "..."
+            : cleanDetail}
         </pre>
       )}
     </div>

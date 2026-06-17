@@ -2,6 +2,7 @@
 import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import type { ToolCallEvent } from "../../lib/types";
 import { t } from "../../lib/i18n";
+import { stripAnsi } from "../../lib/commandOutput";
 import { useSettingsStore } from "../../stores/settingsStore";
 
 interface Props {
@@ -31,14 +32,15 @@ function parseArgs(argsStr: string): Record<string, string> {
 }
 
 function truncateResult(result: string, maxLines = 3, maxChars = 200): string {
-  const lines = result.split("\n");
-  if (lines.length > maxLines || result.length > maxChars) {
+  const cleanResult = stripAnsi(result);
+  const lines = cleanResult.split("\n");
+  if (lines.length > maxLines || cleanResult.length > maxChars) {
     const truncated = lines.slice(0, maxLines).join("\n");
     return truncated.length > maxChars
       ? truncated.slice(0, maxChars) + "..."
       : truncated + "\n...";
   }
-  return result;
+  return cleanResult;
 }
 
 export function ToolCallCard({ toolCall, compact = false }: Props) {
@@ -103,7 +105,7 @@ export function ToolCallCard({ toolCall, compact = false }: Props) {
               </span>
               <pre className="mt-1 bg-surface rounded p-2 text-xs overflow-x-auto whitespace-pre-wrap text-txt-2">
                 {expanded
-                  ? toolCall.result
+                  ? stripAnsi(toolCall.result)
                   : truncateResult(toolCall.result)}
               </pre>
             </div>

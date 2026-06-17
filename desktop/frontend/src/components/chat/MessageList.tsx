@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useChatStore } from "../../stores/chatStore";
 import { MessageBubble } from "./MessageBubble";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -23,30 +23,67 @@ export function MessageList() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoFollowRef = useRef(true);
+  const programmaticScrollUntilRef = useRef(0);
   const actionButtonRef = useRef<HTMLButtonElement | null>(null);
   const selectionHighlightRef = useRef<HTMLDivElement | null>(null);
   const selectedTextRef = useRef("");
   const previousMessageCount = useRef(0);
   const skillCommands = useSkillCommands();
   const activeSelectedSkills = [...messages].reverse().find((message) => message.role === "user")?.selectedSkills || [];
+  const [isNearBottom, setIsNearBottom] = useState(true);
+
+  const isScrolledNearBottom = useCallback((el: HTMLDivElement) => {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const el = containerRef.current;
+    if (!el) return;
+    autoFollowRef.current = true;
+    programmaticScrollUntilRef.current = Date.now() + 500;
+    setIsNearBottom(true);
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
 
   // Jump immediately for loaded history; smooth-scroll only for live streaming deltas.
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const isBulkHistoryLoad = messages.length > previousMessageCount.current + 1 && !currentDelta && !currentThinking && currentToolCalls.length === 0;
+    const previousCount = previousMessageCount.current;
+    const isBulkHistoryLoad = messages.length > previousCount + 1 && !currentDelta && !currentThinking && currentToolCalls.length === 0;
+    const latestMessage = messages[messages.length - 1];
+    const addedMessage = messages.length > previousCount;
     previousMessageCount.current = messages.length;
 
-    if (isBulkHistoryLoad) {
-      el.scrollTop = el.scrollHeight;
+    if (isBulkHistoryLoad || (addedMessage && latestMessage?.role === "user")) {
+      scrollToBottom("auto");
       return;
     }
 
+    if (!autoFollowRef.current && !isScrolledNearBottom(el)) return;
+
     requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      scrollToBottom("smooth");
     });
-  }, [messages.length, currentDelta, currentThinking, currentToolCalls.length]);
+  }, [messages, currentDelta, currentThinking, currentToolCalls.length, isScrolledNearBottom, scrollToBottom]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScrollPosition = () => {
+      const nearBottom = isScrolledNearBottom(container);
+      setIsNearBottom(nearBottom);
+      if (Date.now() < programmaticScrollUntilRef.current) return;
+      autoFollowRef.current = nearBottom;
+    };
+
+    handleScrollPosition();
+    container.addEventListener("scroll", handleScrollPosition, { passive: true });
+    return () => container.removeEventListener("scroll", handleScrollPosition);
+  }, [isScrolledNearBottom]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -169,10 +206,11 @@ export function MessageList() {
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className={`chat-message-scroll flex-1 overflow-y-auto px-6 py-4 select-text ${messages.length > 0 || isStreaming ? "space-y-1" : ""}`}
-    >
+    <div className="relative flex-1 min-h-0">
+      <div
+        ref={containerRef}
+        className={`chat-message-scroll h-full overflow-y-auto px-6 py-4 select-text ${messages.length > 0 || isStreaming ? "space-y-1" : ""}`}
+      >
       {messages.length === 0 && !isStreaming && (
         <div className="flex flex-col items-center justify-center h-full text-[var(--text-ghost)] -mt-4">
           <div className="text-4xl font-bold text-[var(--color-accent)]/60 mb-3">MiMo</div>
@@ -229,7 +267,20 @@ export function MessageList() {
         </div>
       )}
 
-      {(messages.length > 0 || isStreaming) && <div ref={bottomRef} />}
+        {(messages.length > 0 || isStreaming) && <div ref={bottomRef} />}
+      </div>
+
+      {(messages.length > 0 || isStreaming) && !isNearBottom && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom("smooth")}
+          className="absolute bottom-4 right-4 z-20 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/95 px-3 py-2 text-xs text-[var(--text-primary)] shadow-lg backdrop-blur transition-colors hover:bg-[var(--bg-elevated)] cursor-pointer"
+          title={t("scroll_to_bottom")}
+          aria-label={t("scroll_to_bottom")}
+        >
+          ↓ {t("scroll_to_bottom")}
+        </button>
+      )}
     </div>
   );
 }

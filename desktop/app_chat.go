@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -248,6 +249,7 @@ func (a *App) runSelectedSkillCommands(ctx context.Context, runs []selectedSkill
 		if err != nil {
 			return nil, err
 		}
+		result.Output = summarizeShellOutput(result.Output)
 		resultJSON, _ := json.Marshal(result)
 		runtime.EventsEmit(a.ctx, EventToolResult, "shell", string(resultJSON))
 
@@ -262,6 +264,55 @@ func (a *App) runSelectedSkillCommands(ctx context.Context, runs []selectedSkill
 	}
 
 	return results, nil
+}
+
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+
+func stripANSI(input string) string {
+	clean := ansiEscapePattern.ReplaceAllString(input, "")
+	clean = strings.ReplaceAll(clean, "\r\n", "\n")
+	clean = strings.ReplaceAll(clean, "\r", "\n")
+	return clean
+}
+
+func summarizeShellOutput(output string) string {
+	clean := strings.TrimSpace(stripANSI(output))
+	if clean == "" {
+		return ""
+	}
+
+	var lines []string
+	for _, line := range strings.Split(clean, "\n") {
+		line = strings.TrimRight(line, " \t")
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var important []string
+	for _, line := range lines {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "warning") ||
+			strings.Contains(lower, "error") ||
+			strings.Contains(lower, "failed") ||
+			strings.Contains(lower, "built in") ||
+			strings.Contains(lower, "chunks are larger") ||
+			strings.Contains(lower, "to load an es module") {
+			important = append(important, line)
+		}
+	}
+
+	selected := important
+	if len(selected) == 0 {
+		selected = lines
+	}
+	if len(selected) > 8 {
+		selected = selected[len(selected)-8:]
+	}
+	return strings.TrimSpace(strings.Join(selected, "\n"))
 }
 
 // CancelOperation cancels the current agent operation.

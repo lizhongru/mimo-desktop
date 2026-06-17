@@ -89,6 +89,7 @@ type TranslationKey =
   | "close_tooltip"
   | "toggle_left_sidebar"
   | "toggle_right_sidebar"
+  | "scroll_to_bottom"
   | "no_activity"
   | "all_mcp_tools"
   | "compressing_context"
@@ -387,6 +388,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     close_tooltip: "关闭",
     toggle_left_sidebar: "切换左侧栏",
     toggle_right_sidebar: "切换右侧栏",
+    scroll_to_bottom: "回到底部",
     no_activity: "暂无活动",
     all_mcp_tools: "所有 MCP 工具",
     compressing_context: "正在压缩上下文...",
@@ -679,6 +681,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     close_tooltip: "Close",
     toggle_left_sidebar: "Toggle sidebar (Ctrl+B)",
     toggle_right_sidebar: "Toggle activity panel (Ctrl+I)",
+    scroll_to_bottom: "Jump to bottom",
     no_activity: "No activity yet",
     all_mcp_tools: "All MCP Tools",
     compressing_context: "Compressing context...",

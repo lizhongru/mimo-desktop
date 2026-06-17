@@ -112,6 +112,28 @@ func TestSelectedCommandOnlySkillSkipsUnsafeCommand(t *testing.T) {
 	}
 }
 
+func TestSummarizeShellOutputStripsANSIAndKeepsImportantLines(t *testing.T) {
+	output := "\x1b[2mdist/\x1b[22m\x1b[36massets/ToolsViewer.js\x1b[39m 5.22 kB\n" +
+		"\x1b[32m✓ built in 4.74s\x1b[39m\n" +
+		"--- stderr ---\n" +
+		"(node:123) Warning: To load an ES module, set \"type\": \"module\" in the package.json\n" +
+		"\x1b[33m(!) Some chunks are larger than 500 kB after minification. Consider:\x1b[39m\n" +
+		"- Using dynamic import() to code-split the application\n"
+
+	summary := summarizeShellOutput(output)
+	if strings.Contains(summary, "\x1b") || strings.Contains(summary, "[2m") || strings.Contains(summary, "[39m") {
+		t.Fatalf("summary still contains ANSI fragments: %q", summary)
+	}
+	if strings.Contains(summary, "ToolsViewer.js") {
+		t.Fatalf("summary should omit verbose asset list: %q", summary)
+	}
+	for _, expected := range []string{"built in 4.74s", "Warning: To load an ES module", "Some chunks are larger"} {
+		if !strings.Contains(summary, expected) {
+			t.Fatalf("summary missing %q: %q", expected, summary)
+		}
+	}
+}
+
 func TestBuildSystemPromptIncludesEnabledProjectSkills(t *testing.T) {
 	projectDir := t.TempDir()
 	skillDir := filepath.Join(projectDir, ".mimo", "skills", "test_skill")
