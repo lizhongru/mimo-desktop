@@ -230,8 +230,9 @@ func buildEnabledProjectSkillsContext(projectDir string, selectedSkills []string
 			continue
 		}
 		if content.Len() == 0 {
-			content.WriteString("## Enabled Project Skills\n\n")
-			content.WriteString("The following project skills are enabled. Follow them when relevant to the user's request.\n")
+			content.WriteString("## Selected Project Skills\n\n")
+			content.WriteString("The user explicitly selected the following project skills for this turn. Treat them as active instructions for the current request, not as optional background context.\n")
+			content.WriteString("Apply the selected skill workflow before doing broad project exploration. If a selected skill contains commands, run those exact commands unless they are unsafe or impossible, and explain any deviation to the user.\n")
 		}
 		content.WriteString("\n### ")
 		content.WriteString(normalized)

@@ -63,8 +63,11 @@ func TestBuildSystemPromptIncludesEnabledProjectSkills(t *testing.T) {
 	}
 
 	prompt = app.buildSystemPrompt(projectDir, "test_skill")
-	if !strings.Contains(prompt, "## Enabled Project Skills") {
-		t.Fatalf("system prompt does not include enabled skills section")
+	if !strings.Contains(prompt, "## Selected Project Skills") {
+		t.Fatalf("system prompt does not include selected skills section")
+	}
+	if !strings.Contains(prompt, "run those exact commands") {
+		t.Fatalf("system prompt should instruct agent to apply selected skill commands")
 	}
 	if !strings.Contains(prompt, "CUSTOM ENABLED SKILL SENTINEL") {
 		t.Fatalf("system prompt does not include enabled skill content")
