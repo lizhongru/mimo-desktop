@@ -65,15 +65,18 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 	workingDir := OptionalStringParam(params, "working_dir", "")
 	workingDir = ResolvePath(ctx, workingDir)
 
-	// Create command with timeout
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	// Create command with timeout. On Windows, CommandContext only kills cmd.exe,
+	// while long-running children like npm/vite can keep stdout pipes open and make
+	// cmd.Run wait forever. Start the command manually and kill the full process
+	// tree on timeout.
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
+		cmd = exec.Command("cmd", "/C", command)
 	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+		cmd = exec.CommandContext(timeoutCtx, "sh", "-c", command)
 	}
 
 	cmd.Dir = workingDir
@@ -83,7 +86,7 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 	cmd.Stderr = &stderr
 
 	start := time.Now()
-	err := cmd.Run()
+	err := runShellCommand(timeoutCtx, cmd)
 	duration := time.Since(start).Seconds()
 
 	result := &ToolResult{
@@ -103,7 +106,7 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitErr.ExitCode()
 			result.Error = fmt.Sprintf("command exited with code %d", exitErr.ExitCode())
-		} else if ctx.Err() == context.DeadlineExceeded {
+		} else if timeoutCtx.Err() == context.DeadlineExceeded {
 			result.Error = fmt.Sprintf("command timed out after %ds", timeout)
 			result.ExitCode = -1
 		} else {
@@ -113,6 +116,39 @@ func (t *ShellTool) Execute(ctx context.Context, params map[string]interface{}) 
 	}
 
 	return result, nil
+}
+
+func runShellCommand(ctx context.Context, cmd *exec.Cmd) error {
+	if runtime.GOOS != "windows" {
+		return cmd.Run()
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		if cmd.Process != nil {
+			_ = exec.Command("taskkill", "/T", "/F", "/PID", fmt.Sprintf("%d", cmd.Process.Pid)).Run()
+		}
+		select {
+		case err := <-done:
+			if err != nil {
+				return ctx.Err()
+			}
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+			return ctx.Err()
+		}
+	}
 }
 
 // isDangerousCommand checks if a command is potentially dangerous

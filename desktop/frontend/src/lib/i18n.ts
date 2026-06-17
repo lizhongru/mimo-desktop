@@ -567,6 +567,11 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     skill_candidate_explain_deploy_workflow: "用于复用部署相关工作流。选择后，助手会优先参考该 Skill 中的部署步骤和命令。",
     skill_candidate_explain_command: "用于复用历史会话中反复出现的命令流程。选择后，助手会参考并优先使用命令：{command}",
     skill_candidate_explain_default: "用于复用历史会话中提炼出的工作方法。选择后，助手会参考该 Skill 的说明和步骤。",
+    message_selected_skills: "本轮使用",
+    skill_run_status_title: "正在执行选中的 Skill",
+    skill_run_status_preparing: "正在准备执行 Skill 命令...",
+    skill_run_status_running_tools: "正在等待工具结果...",
+    skill_run_status_summarizing: "Skill 命令已执行，正在总结...",
 
   },
   en: {
